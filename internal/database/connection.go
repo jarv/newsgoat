@@ -1,0 +1,56 @@
+package database
+
+import (
+	"database/sql"
+	"os"
+	"path/filepath"
+
+	_ "github.com/mattn/go-sqlite3"
+)
+
+func InitDB() (*sql.DB, *Queries, error) {
+	return InitDBWithSchema("")
+}
+
+func InitDBWithSchema(schemaSQL string) (*sql.DB, *Queries, error) {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	dbDir := filepath.Join(homeDir, ".newsgoat")
+	if err := os.MkdirAll(dbDir, 0755); err != nil {
+		return nil, nil, err
+	}
+
+	dbPath := filepath.Join(dbDir, "newsgoat.db")
+
+	// Add SQLite connection parameters for better concurrency
+	// dsn := dbPath + "?_busy_timeout=60000&_journal_mode=WAL&_synchronous=NORMAL&_cache_size=2000&_locking_mode=NORMAL&_foreign_keys=ON"
+	db, err := sql.Open("sqlite3", dbPath) // dsn)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Configure connection pool - limit connections to reduce contention
+	// SQLite with WAL mode works best with fewer concurrent writers
+	// db.SetMaxOpenConns(3)    // Reduce from 10 to 3
+	// db.SetMaxIdleConns(2)    // Keep some idle connections
+	// db.SetConnMaxLifetime(0) // No limit
+
+	if schemaSQL != "" {
+		if err := createTables(db, schemaSQL); err != nil {
+			_ = db.Close()
+			return nil, nil, err
+		}
+	}
+
+	queries := New(db)
+	return db, queries, nil
+}
+
+func createTables(db *sql.DB, schemaSQL string) error {
+	_, err := db.Exec(schemaSQL)
+	return err
+}
+

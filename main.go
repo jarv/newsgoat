@@ -1,0 +1,167 @@
+package main
+
+import (
+	"context"
+	_ "embed"
+	"flag"
+	"fmt"
+	"log/slog"
+	"os"
+
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/jarv/newsgoat/internal/config"
+	"github.com/jarv/newsgoat/internal/database"
+	"github.com/jarv/newsgoat/internal/feeds"
+	"github.com/jarv/newsgoat/internal/logging"
+	"github.com/jarv/newsgoat/internal/tasks"
+	"github.com/jarv/newsgoat/internal/ui"
+	"github.com/jarv/newsgoat/internal/version"
+)
+
+//go:embed sql/schema.sql
+var schemaSQL string
+
+var logger *slog.Logger
+
+func setupLogging(queries *database.Queries) {
+	slogHandler := logging.NewDatabaseHandler(queries)
+	logger = slog.New(slogHandler)
+
+	// Set the global logger for other packages
+	logging.SetLogger(logger)
+}
+
+func main() {
+	var feedTest = flag.Bool("feedTest", false, "Run feed test harness server")
+	var showVersion = flag.Bool("version", false, "Show version information")
+	flag.Parse()
+
+	if *showVersion {
+		fmt.Println(version.GetUserAgent())
+		return
+	}
+
+	if *feedTest {
+		if err := runFeedTestHarness(); err != nil {
+			fmt.Fprintf(os.Stderr, "1Error: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
+
+	if err := run(); err != nil {
+		fmt.Fprintf(os.Stderr, "2Error: %v\n", err)
+		os.Exit(1)
+	}
+}
+
+func run() error {
+	// Initialize database first
+	db, queries, err := database.InitDBWithSchema(schemaSQL)
+	if err != nil {
+		return fmt.Errorf("failed to initialize database: %w", err)
+	}
+
+	// Load configuration from database
+	cfg, err := config.LoadConfig(queries)
+	if err != nil {
+		fmt.Printf("Failed to load config, using defaults: %v\n", err)
+		cfg = config.GetDefaultConfig()
+	}
+
+	// Setup logging after database is initialized
+	setupLogging(queries)
+	defer func() {
+		if closeErr := db.Close(); closeErr != nil {
+			logger.Error("Error closing database", "error", closeErr)
+		}
+	}()
+
+	feedManager := feeds.NewManager(db, queries)
+
+	// Create and start task manager
+	taskManager := tasks.NewManager(cfg.ReloadConcurrency)
+	ctx := context.Background()
+	if err := taskManager.Start(ctx); err != nil {
+		return fmt.Errorf("failed to start task manager: %w", err)
+	}
+	defer func() {
+		if stopErr := taskManager.Stop(); stopErr != nil {
+			logger.Error("Error stopping task manager", "error", stopErr)
+		}
+	}()
+
+	// Register feed refresh handler
+	feedRefreshHandler := tasks.NewFeedRefreshHandler(feedManager)
+	if err := taskManager.RegisterHandler(feedRefreshHandler); err != nil {
+		return fmt.Errorf("failed to register feed refresh handler: %w", err)
+	}
+
+	if err := config.CreateSampleURLsFile(); err != nil {
+		logger.Warn("Failed to create sample URLs file", "error", err)
+	}
+
+	urls, err := config.ReadURLsFile()
+	if err != nil {
+		return fmt.Errorf("failed to read URLs file: %w", err)
+	}
+
+	if err := syncFeedsWithURLsFile(feedManager, urls); err != nil {
+		logger.Warn("Failed to sync feeds with URLs file", "error", err)
+	}
+
+	model := ui.NewModel(feedManager, taskManager, queries, cfg)
+	p := tea.NewProgram(model, tea.WithAltScreen())
+
+	if _, err := p.Run(); err != nil {
+		return fmt.Errorf("failed to run TUI: %w", err)
+	}
+
+	return nil
+}
+
+func syncFeedsWithURLsFile(feedManager *feeds.Manager, urlsFromFile []string) error {
+	// Get all feeds from database (including hidden ones)
+	allFeeds, err := feedManager.GetAllFeeds()
+	if err != nil {
+		return fmt.Errorf("failed to get all feeds: %w", err)
+	}
+
+	// Create a set of URLs from the file for quick lookup
+	urlsFromFileSet := make(map[string]bool)
+	for _, url := range urlsFromFile {
+		urlsFromFileSet[url] = true
+	}
+
+	// Create a set of URLs from DB for quick lookup
+	urlsFromDBSet := make(map[string]bool)
+	for _, feed := range allFeeds {
+		urlsFromDBSet[feed.Url] = true
+	}
+
+	// Hide feeds that are in DB but not in URLs file
+	for _, feed := range allFeeds {
+		if !urlsFromFileSet[feed.Url] {
+			if err := feedManager.HideFeedByURL(feed.Url); err != nil {
+				logger.Warn("Failed to hide feed", "url", feed.Url, "error", err)
+			}
+		}
+	}
+
+	// Show/Add feeds that are in URLs file
+	for _, url := range urlsFromFile {
+		if urlsFromDBSet[url] {
+			// Feed exists in DB, make sure it's visible
+			if err := feedManager.ShowFeedByURL(url); err != nil {
+				logger.Warn("Failed to show feed", "url", url, "error", err)
+			}
+		} else {
+			// Feed doesn't exist, add it without fetching
+			if err := feedManager.AddFeedWithoutFetching(url); err != nil {
+				logger.Warn("Failed to add feed", "url", url, "error", err)
+			}
+		}
+	}
+
+	return nil
+}

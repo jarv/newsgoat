@@ -1,0 +1,34 @@
+{
+  "branches": ["main"],
+  "plugins": [
+    "@semantic-release/commit-analyzer",
+    "@semantic-release/release-notes-generator",
+    "@semantic-release/changelog",
+    [
+      "@semantic-release/exec",
+      {
+        "publishCmd": "echo 'Version ${nextRelease.version} published'"
+      }
+    ],
+    [
+      "@semantic-release/github",
+      {
+        "assets": [
+          {"path": "newsgoat-linux-amd64", "label": "newsgoat-linux-amd64"},
+          {"path": "newsgoat-linux-arm64", "label": "newsgoat-linux-arm64"},
+          {"path": "newsgoat-darwin-amd64", "label": "newsgoat-darwin-amd64"},
+          {"path": "newsgoat-darwin-arm64", "label": "newsgoat-darwin-arm64"},
+          {"path": "newsgoat-windows-amd64.exe", "label": "newsgoat-windows-amd64.exe"},
+          {"path": "checksums.txt", "label": "checksums.txt"}
+        ]
+      }
+    ],
+    [
+      "@semantic-release/git",
+      {
+        "assets": ["CHANGELOG.md"],
+        "message": "chore(release): ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}"
+      }
+    ]
+  ]
+}

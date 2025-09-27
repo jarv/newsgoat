@@ -1,0 +1,54 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.1'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install semantic-release
+        run: npm install -g semantic-release @semantic-release/git @semantic-release/changelog @semantic-release/exec
+
+      - name: Build multi-arch binaries
+        run: |
+          # Linux
+          GOOS=linux GOARCH=amd64 go build -o newsgoat-linux-amd64 .
+          GOOS=linux GOARCH=arm64 go build -o newsgoat-linux-arm64 .
+
+          # macOS
+          GOOS=darwin GOARCH=amd64 go build -o newsgoat-darwin-amd64 .
+          GOOS=darwin GOARCH=arm64 go build -o newsgoat-darwin-arm64 .
+
+          # Windows
+          GOOS=windows GOARCH=amd64 go build -o newsgoat-windows-amd64.exe .
+
+          # Create checksums
+          sha256sum newsgoat-* > checksums.txt
+
+      - name: Run semantic-release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx semantic-release

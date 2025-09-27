@@ -1,0 +1,26 @@
+[tools]
+golang = "1.25.1"
+golangci-lint = "2.5.0"
+shellcheck = "0.11.0"
+nodejs = "22.20.0"
+shfmt = "3.12.0"
+vale = "3.3.0"
+watchexec = "latest"
+
+[tasks.golangci-lint]
+run = "golangci-lint run ./..."
+
+[tasks.build]
+run = """
+GIT_HASH=$(git rev-parse --short HEAD 2>/dev/null || echo "dev")
+go build -ldflags "-w -X github.com/jarv/newsgoat/internal/version.GitHash=${GIT_HASH}" -o newsgoat
+"""
+
+[tasks.run]
+sources =[
+  '**/*',
+]
+run = "go run ."
+
+[tasks.watch]
+run = "mise watch -r run"
