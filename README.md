@@ -27,14 +27,15 @@ It's inspired by [newsboat](https://github.com/newsboat/newsboat) and provides a
 
 If you know of any other CLI based RSS readers worth mentioning here please add them!
 
+## Configure
+
+Create a `.config/newsgoat/urls` file with one feed per line.
+
 ## Build and Run
 
 ```bash
-mise install
-mise run build          # Build binary
-mise run run            # Run the application directly
-mise run watch          # Watch for changes and auto-run
-mise run golangci-lint  # Run linting
+go run . # Run with urls file in .config/newsgoat/urls
+go run . -urlFile urls.example # Run using the example urls file
 ```
 
 ## Install

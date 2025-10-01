@@ -34,6 +34,8 @@ func setupLogging(queries *database.Queries) {
 func main() {
 	var feedTest = flag.Bool("feedTest", false, "Run feed test harness server")
 	var showVersion = flag.Bool("version", false, "Show version information")
+	var urlFile = flag.String("u", "", "Path to URL file (overrides default location)")
+	flag.StringVar(urlFile, "urlFile", "", "Path to URL file (overrides default location)")
 	flag.Parse()
 
 	if *showVersion {
@@ -49,13 +51,13 @@ func main() {
 		return
 	}
 
-	if err := run(); err != nil {
+	if err := run(*urlFile); err != nil {
 		fmt.Fprintf(os.Stderr, "2Error: %v\n", err)
 		os.Exit(1)
 	}
 }
 
-func run() error {
+func run(urlFile string) error {
 	// Initialize database first
 	db, queries, err := database.InitDBWithSchema(schemaSQL)
 	if err != nil {
@@ -101,9 +103,19 @@ func run() error {
 		logger.Warn("Failed to create sample URLs file", "error", err)
 	}
 
-	urls, err := config.ReadURLsFile()
-	if err != nil {
-		return fmt.Errorf("failed to read URLs file: %w", err)
+	var urls []string
+	if urlFile != "" {
+		var readErr error
+		urls, readErr = config.ReadURLsFileFromPath(urlFile)
+		if readErr != nil {
+			return fmt.Errorf("failed to read URLs file: %w", readErr)
+		}
+	} else {
+		var readErr error
+		urls, readErr = config.ReadURLsFile()
+		if readErr != nil {
+			return fmt.Errorf("failed to read URLs file: %w", readErr)
+		}
 	}
 
 	if err := syncFeedsWithURLsFile(feedManager, urls); err != nil {

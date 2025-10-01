@@ -35,6 +35,10 @@ func ReadURLsFile() ([]string, error) {
 		return nil, err
 	}
 
+	return ReadURLsFileFromPath(urlsPath)
+}
+
+func ReadURLsFileFromPath(urlsPath string) ([]string, error) {
 	file, err := os.Open(urlsPath)
 	if err != nil {
 		if os.IsNotExist(err) {
