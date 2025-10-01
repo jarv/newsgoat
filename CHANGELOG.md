@@ -1,3 +1,10 @@
+# [1.1.0](https://github.com/jarv/newsgoat/compare/v1.0.3...v1.1.0) (2025-10-01)
+
+
+### Features
+
+* Adds urlFile option and urls.example ([ba14c7c](https://github.com/jarv/newsgoat/commit/ba14c7c9d1ce65dc7ee51c5bf13c4682daa8d30c))
+
 ## [1.0.3](https://github.com/jarv/newsgoat/compare/v1.0.2...v1.0.3) (2025-10-01)
 
 
