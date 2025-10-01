@@ -29,24 +29,25 @@ jobs:
         with:
           node-version: '22'
 
+      - name: Install cross-compilation toolchains
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-x86-64-linux-gnu gcc-aarch64-linux-gnu
+
+          # Install zig for macOS cross-compilation
+          wget https://ziglang.org/download/0.13.0/zig-linux-x86_64-0.13.0.tar.xz
+          tar -xf zig-linux-x86_64-0.13.0.tar.xz
+          sudo mv zig-linux-x86_64-0.13.0 /usr/local/zig
+          echo "/usr/local/zig" >> $GITHUB_PATH
+
+      - name: Install mise
+        run: curl https://mise.run | sh && echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Install mise tools
+        run: mise install
+
       - name: Install semantic-release
         run: npm install -g semantic-release @semantic-release/git @semantic-release/changelog @semantic-release/exec
-
-      - name: Build multi-arch binaries
-        run: |
-          # Linux
-          GOOS=linux GOARCH=amd64 go build -o newsgoat-linux-amd64 .
-          GOOS=linux GOARCH=arm64 go build -o newsgoat-linux-arm64 .
-
-          # macOS
-          GOOS=darwin GOARCH=amd64 go build -o newsgoat-darwin-amd64 .
-          GOOS=darwin GOARCH=arm64 go build -o newsgoat-darwin-arm64 .
-
-          # Windows
-          GOOS=windows GOARCH=amd64 go build -o newsgoat-windows-amd64.exe .
-
-          # Create checksums
-          sha256sum newsgoat-* > checksums.txt
 
       - name: Run semantic-release
         env:

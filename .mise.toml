@@ -24,3 +24,25 @@ run = "go run ."
 
 [tasks.watch]
 run = "mise watch -r run"
+
+[tasks.build-release]
+run = """
+VERSION="${1:-dev}"
+LDFLAGS="-w -X github.com/jarv/newsgoat/internal/version.GitHash=v${VERSION}"
+
+# Set Zig cache directory to avoid permission issues
+export ZIG_LOCAL_CACHE_DIR="${TMPDIR:-/tmp}/zig-cache"
+export ZIG_GLOBAL_CACHE_DIR="${TMPDIR:-/tmp}/zig-global-cache"
+mkdir -p "$ZIG_LOCAL_CACHE_DIR" "$ZIG_GLOBAL_CACHE_DIR"
+
+# Linux
+CGO_ENABLED=1 GOOS=linux GOARCH=amd64 CC=x86_64-linux-gnu-gcc go build -ldflags "$LDFLAGS" -o newsgoat-linux-amd64 .
+CGO_ENABLED=1 GOOS=linux GOARCH=arm64 CC=aarch64-linux-gnu-gcc go build -ldflags "$LDFLAGS" -o newsgoat-linux-arm64 .
+
+# macOS (requires zig cc for cross-compilation on Linux)
+CGO_ENABLED=1 GOOS=darwin GOARCH=amd64 CC="zig cc -target x86_64-macos" CXX="zig c++ -target x86_64-macos" go build -ldflags "$LDFLAGS" -o newsgoat-darwin-amd64 .
+CGO_ENABLED=1 GOOS=darwin GOARCH=arm64 CC="zig cc -target aarch64-macos" CXX="zig c++ -target aarch64-macos" go build -ldflags "$LDFLAGS" -o newsgoat-darwin-arm64 .
+
+# Create checksums
+sha256sum newsgoat-* > checksums.txt
+"""

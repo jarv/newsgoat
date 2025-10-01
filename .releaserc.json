@@ -7,6 +7,7 @@
     [
       "@semantic-release/exec",
       {
+        "prepareCmd": "mise run build-release ${nextRelease.version}",
         "publishCmd": "echo 'Version ${nextRelease.version} published'"
       }
     ],
@@ -18,7 +19,6 @@
           {"path": "newsgoat-linux-arm64", "label": "newsgoat-linux-arm64"},
           {"path": "newsgoat-darwin-amd64", "label": "newsgoat-darwin-amd64"},
           {"path": "newsgoat-darwin-arm64", "label": "newsgoat-darwin-arm64"},
-          {"path": "newsgoat-windows-amd64.exe", "label": "newsgoat-windows-amd64.exe"},
           {"path": "checksums.txt", "label": "checksums.txt"}
         ]
       }
