@@ -1,3 +1,10 @@
+## [1.0.3](https://github.com/jarv/newsgoat/compare/v1.0.2...v1.0.3) (2025-10-01)
+
+
+### Bug Fixes
+
+* **deps:** update module github.com/johanneskaufmann/html-to-markdown to v2 ([4fdca7e](https://github.com/jarv/newsgoat/commit/4fdca7ec75537c8510d9b9c737785b31736d948b))
+
 ## [1.0.2](https://github.com/jarv/newsgoat/compare/v1.0.1...v1.0.2) (2025-10-01)
 
 
