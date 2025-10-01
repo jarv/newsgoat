@@ -1,3 +1,10 @@
+## [1.1.1](https://github.com/jarv/newsgoat/compare/v1.1.0...v1.1.1) (2025-10-01)
+
+
+### Bug Fixes
+
+* **deps:** update module github.com/charmbracelet/lipgloss to v2 ([#7](https://github.com/jarv/newsgoat/issues/7)) ([eeb86b0](https://github.com/jarv/newsgoat/commit/eeb86b05035e9bbde9ae83e4e7d294a2ee07cc79))
+
 # [1.1.0](https://github.com/jarv/newsgoat/compare/v1.0.3...v1.1.0) (2025-10-01)
 
 
