@@ -1,6 +1,9 @@
 # NewsGoat
 
-<img src="./.github/newsgoat.png" width="200">
+<p align="left">
+  <img src="./.github/screenshot.png" height="200">
+  <img src="./.github/newsgoat.png" height="200">
+</p>
 
 NewsGoat is a terminal-based RSS reader written in Go using the [bubbletea TUI framework](https://github.com/charmbracelet/bubbletea).
 It's inspired by [newsboat](https://github.com/newsboat/newsboat) and provides a vi-like interface for reading RSS feeds.
