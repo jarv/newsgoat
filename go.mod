@@ -8,9 +8,8 @@ require (
 	github.com/charmbracelet/glamour v0.10.0
 	github.com/charmbracelet/lipgloss v1.1.1-0.20250404203927-76690c660834
 	github.com/google/uuid v1.6.0
-	github.com/mattn/go-sqlite3 v1.14.32
 	github.com/mmcdole/gofeed v1.3.0
-	gopkg.in/yaml.v3 v3.0.1
+	github.com/ncruces/go-sqlite3 v0.29.1
 )
 
 require (
@@ -40,7 +39,9 @@ require (
 	github.com/muesli/cancelreader v0.2.2 // indirect
 	github.com/muesli/reflow v0.3.0 // indirect
 	github.com/muesli/termenv v0.16.0 // indirect
+	github.com/ncruces/julianday v1.0.0 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
+	github.com/tetratelabs/wazero v1.9.0 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
 	github.com/yuin/goldmark v1.7.8 // indirect
 	github.com/yuin/goldmark-emoji v1.0.5 // indirect
@@ -48,5 +49,5 @@ require (
 	golang.org/x/net v0.33.0 // indirect
 	golang.org/x/sys v0.36.0 // indirect
 	golang.org/x/term v0.31.0 // indirect
-	golang.org/x/text v0.24.0 // indirect
+	golang.org/x/text v0.29.0 // indirect
 )
