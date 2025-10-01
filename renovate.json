@@ -10,5 +10,13 @@
   "requiredStatusChecks": [
     "integration-tests"
   ],
-  "recreateWhen": "always"
+  "recreateWhen": "always",
+  "packageRules": [
+    {
+      "matchPackagePatterns": [
+        "*"
+      ],
+      "ignoreUnstable": true
+    }
+  ]
 }
