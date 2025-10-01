@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	md "github.com/JohannesKaufmann/html-to-markdown"
+	md "github.com/JohannesKaufmann/html-to-markdown/v2"
 	"github.com/jarv/newsgoat/internal/database"
 	"github.com/jarv/newsgoat/internal/logging"
 	"github.com/jarv/newsgoat/internal/version"
@@ -25,10 +25,10 @@ type LogMessage = database.LogMessage
 
 // conditionalRequestTransport wraps http.RoundTripper to add conditional request headers and User-Agent
 type conditionalRequestTransport struct {
-	Transport    http.RoundTripper
-	UserAgent    string
-	Manager      *Manager
-	FeedURL      string
+	Transport http.RoundTripper
+	UserAgent string
+	Manager   *Manager
+	FeedURL   string
 }
 
 func (t *conditionalRequestTransport) RoundTrip(req *http.Request) (*http.Response, error) {
@@ -61,7 +61,6 @@ type Manager struct {
 	db               *sql.DB
 	queries          *database.Queries
 	parser           *gofeed.Parser
-	htmlConverter    *md.Converter
 	refreshCallbacks map[int64]func(int64) // Callbacks for refresh events
 	dbMutex          sync.RWMutex          // Global RWMutex for database operations
 }
@@ -99,8 +98,8 @@ func (m *Manager) ConvertHTMLToMarkdown(input string) string {
 		return ""
 	}
 
-	// Convert HTML to markdown using html-to-markdown
-	markdown, err := m.htmlConverter.ConvertString(input)
+	// Convert HTML to markdown using html-to-markdown v2
+	markdown, err := md.ConvertString(input)
 	if err != nil {
 		logging.Warn("Failed to convert HTML to markdown", "error", err)
 		// Fallback to original text if conversion fails
@@ -122,9 +121,6 @@ func (m *Manager) ConvertHTMLToMarkdown(input string) string {
 }
 
 func NewManager(db *sql.DB, queries *database.Queries) *Manager {
-	// Create HTML to markdown converter
-	converter := md.NewConverter("", true, nil)
-
 	// Create parser - we'll set the client per-request
 	parser := gofeed.NewParser()
 
@@ -132,7 +128,6 @@ func NewManager(db *sql.DB, queries *database.Queries) *Manager {
 		db:               db,
 		queries:          queries,
 		parser:           parser,
-		htmlConverter:    converter,
 		refreshCallbacks: make(map[int64]func(int64)),
 	}
 }
