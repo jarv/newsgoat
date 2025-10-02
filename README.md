@@ -10,13 +10,11 @@ It's inspired by [Newsbeuter](https://github.com/akrennmair/newsbeuter)/[Newsboa
 
 ## Why create another terminal-based RSS reader?
 
-I've been viewing RSS feeds in my terminal for about 15 years.
-The first terminal program used was [Newsbeuter](https://github.com/akrennmair/newsbeuter).
-Around 2017, the maintainer said it would no longer be maintained so I switched to a fork that was renamed to [Newsboat](https://github.com/newsboat/newsboat).
-Getting a bit frustrated with frequent segfaults, especially after the Rust rewrite, I looked for an alternatives.
-The project [nom](https://github.com/guyfedwards/nom) looked interesting but didn't quite have [the feed organization](https://github.com/guyfedwards/nom/issues/106) layout that I wanted.
-Now the kids are vibe coding and it looked like a fun way to test out how quickly I could create my own news reader in a language I know (Go) implementing the exact features I want.
-After approximately 1 day of prompting and making adjustments as I vibed through it, this is the result, enjoy!
+I’ve been using terminal-based RSS readers for about 15 years.
+The first program I used was [Newsbeuter](https://github.com/akrennmair/newsbeuter), but around 2017 its maintainer announced it would no longer be maintained, so I switched to its fork, [Newsboat](https://github.com/newsboat/newsboat).
+Over time, I grew frustrated with frequent segfaults, especially after the Rust rewrite, and started looking for alternatives. A similar CLI RSS reader written in Go called [nom](https://github.com/guyfedwards/nom) looked interesting, but it didn’t offer the feed organization I wanted.
+
+Meanwhile, “vibe coding” was catching on, and it seemed like a fun excuse to see how quickly I could build my own news reader in Go with exactly the features I wanted. After about a day of prompting, tweaking, and vibing through the process, here’s the result—enjoy!
 
 ## Features
 
@@ -60,37 +58,25 @@ go run . -urlFile urls.example # Run using the example urls file
 
 ## Install
 
-### From Release
-
 Download the latest release for your platform from the [releases page](https://github.com/jarv/newsgoat/releases):
 
-#### macOS (Apple Silicon)
+### macOS
 
 ```bash
+# For Apple Silicon
 curl -L https://github.com/jarv/newsgoat/releases/latest/download/newsgoat-darwin-arm64 -o newsgoat
-chmod +x newsgoat
-sudo mv newsgoat /usr/local/bin/
-```
-
-#### macOS (Intel)
-
-```bash
+# For Intel
 curl -L https://github.com/jarv/newsgoat/releases/latest/download/newsgoat-darwin-amd64 -o newsgoat
 chmod +x newsgoat
 sudo mv newsgoat /usr/local/bin/
 ```
 
-#### Linux (amd64)
+### Linux
 
 ```bash
+# For amd64
 curl -L https://github.com/jarv/newsgoat/releases/latest/download/newsgoat-linux-amd64 -o newsgoat
-chmod +x newsgoat
-sudo mv newsgoat /usr/local/bin/
-```
-
-#### Linux (arm64)
-
-```bash
+# For arm64
 curl -L https://github.com/jarv/newsgoat/releases/latest/download/newsgoat-linux-arm64 -o newsgoat
 chmod +x newsgoat
 sudo mv newsgoat /usr/local/bin/
