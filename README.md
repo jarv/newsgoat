@@ -1,12 +1,31 @@
 # NewsGoat
 
 <p align="left">
-  <img src="./.github/screenshot.png" height="200">
-  <img src="./.github/newsgoat.png" height="200">
+  <img src="./.github/screenshot.png" alt="newsgoat screenshot" height="200">
+  <img src="./.github/newsgoat.png" alt="newsgoat icon" height="200">
 </p>
 
 NewsGoat is a terminal-based RSS reader written in Go using the [bubbletea TUI framework](https://github.com/charmbracelet/bubbletea).
-It's inspired by [newsboat](https://github.com/newsboat/newsboat) and provides a vi-like interface for reading RSS feeds.
+It's inspired by [Newsbeuter](https://github.com/akrennmair/newsbeuter)/[Newsboat](https://github.com/newsboat/newsboat) and provides a vi-like interface for reading RSS feeds.
+
+## Why create another terminal-based RSS reader?
+
+I've been viewing RSS feeds in my terminal for about 15 years.
+The first terminal program used was [Newsbeuter](https://github.com/akrennmair/newsbeuter).
+Around 2017, the maintainer said it would no longer be maintained so I switched to a fork that was renamed to [Newsboat](https://github.com/newsboat/newsboat).
+Getting a bit frustrated with frequent crashes, I looked for an alternatives.
+The project [nom](https://github.com/guyfedwards/nom) looked interesting but didn't quite have [the feed organization](https://github.com/guyfedwards/nom/issues/106) layout that I wanted.
+Now the kids are vibe coding and it looked like a fun way to test out how quickly I could create my own news reader in a language I know (Go) implementing the exact features I want.
+After approximately 1 day of prompting and making adjustments as I vibed through it, this is the result, enjoy!
+
+## Features
+
+- Feeds are organized by site
+- Quickly query info for every feed including cache-control, last-updated, etc
+- Logs are shown directly in the UI
+- Refresh task control separate in the app with a way to see what is queued, running and failures
+- Option to put feeds with unread items at the top
+- Automatic feed discovery
 
 ## Design Principles
 
