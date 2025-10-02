@@ -1,3 +1,10 @@
+# [1.3.0](https://github.com/jarv/newsgoat/compare/v1.2.0...v1.3.0) (2025-10-02)
+
+
+### Features
+
+* Add URLs from the tui ([5f93ad0](https://github.com/jarv/newsgoat/commit/5f93ad05ab43d89774290bf51fe5aa3d897dc511))
+
 # [1.2.0](https://github.com/jarv/newsgoat/compare/v1.1.2...v1.2.0) (2025-10-02)
 
 
