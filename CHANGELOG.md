@@ -1,3 +1,10 @@
+## [1.1.2](https://github.com/jarv/newsgoat/compare/v1.1.1...v1.1.2) (2025-10-02)
+
+
+### Bug Fixes
+
+* **deps:** update github.com/charmbracelet/lipgloss digest to 970a4b8 ([#10](https://github.com/jarv/newsgoat/issues/10)) ([046702e](https://github.com/jarv/newsgoat/commit/046702ebc94e55f667223e70ed2436687f5ea057))
+
 ## [1.1.1](https://github.com/jarv/newsgoat/compare/v1.1.0...v1.1.1) (2025-10-01)
 
 
