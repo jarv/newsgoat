@@ -9,6 +9,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/jarv/newsgoat/internal/config"
 	"github.com/jarv/newsgoat/internal/database"
+	"github.com/jarv/newsgoat/internal/discovery"
 	"github.com/jarv/newsgoat/internal/feeds"
 	"github.com/jarv/newsgoat/internal/logging"
 	"github.com/jarv/newsgoat/internal/tasks"
@@ -203,21 +204,6 @@ func listenForTaskEvents(taskManager tasks.Manager) tea.Cmd {
 	}
 }
 
-func loadURLsList() tea.Cmd {
-	return func() tea.Msg {
-		urls, err := config.ReadURLsFile()
-		if err != nil {
-			logging.Error("loadURLsList failed", "error", err)
-			return ErrorMsg{Err: err}
-		}
-		urlsPath, pathErr := config.GetURLsFilePath()
-		if pathErr != nil {
-			urlsPath = ""
-		}
-		return URLsListLoadedMsg{URLs: urls, FilePath: urlsPath}
-	}
-}
-
 func waitForReloadTimer(minutes int) tea.Cmd {
 	return tea.Tick(time.Duration(minutes)*time.Minute, func(time.Time) tea.Msg {
 		return ReloadTimerMsg{}
@@ -290,6 +276,29 @@ func openURLsFileInEditor() tea.Cmd {
 		}
 		return EditorFinishedMsg{}
 	})
+}
+
+func addURLAndDiscover(feedManager *feeds.Manager, urlArg string) tea.Cmd {
+	return func() tea.Msg {
+		// Try to discover the feed URL
+		feedURL, err := discovery.DiscoverFeed(urlArg)
+		if err != nil {
+			return URLAddErrorMsg{Err: "Failed to discover feed: " + err.Error()}
+		}
+
+		// Add the URL to the URLs file
+		if err := config.AddURL(feedURL); err != nil {
+			return URLAddErrorMsg{Err: "Failed to add URL to file: " + err.Error()}
+		}
+
+		// Add feed to database without fetching
+		if err := feedManager.AddFeedWithoutFetching(feedURL); err != nil {
+			// If it already exists, that's okay
+			logging.Warn("Feed may already exist", "url", feedURL, "error", err)
+		}
+
+		return URLAddSuccessMsg{URL: feedURL, DiscoveredURL: feedURL != urlArg}
+	}
 }
 
 func syncFeedsWithURLs(feedManager *feeds.Manager, urls []string) tea.Cmd {

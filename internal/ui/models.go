@@ -199,6 +199,9 @@ type Model struct {
 	statusMessage                   string         // Message to display above status bar
 	statusMessageType               string         // Type of message: "error" or "info"
 	quitPressed                     bool           // Track if 'q' was pressed once (for quit confirmation)
+	ctrlCPressed                    bool           // Track if 'ctrl+c' was pressed once (for quit confirmation)
+	addingURL                       bool           // Track if in URL adding mode
+	urlInput                        string         // Current URL input text
 }
 
 type RefreshMsg struct {
@@ -279,6 +282,15 @@ type ItemReadStatusToggledMsg struct {
 	ItemID int64
 }
 
+type URLAddSuccessMsg struct {
+	URL          string
+	DiscoveredURL bool
+}
+
+type URLAddErrorMsg struct {
+	Err string
+}
+
 type ReloadTimerMsg struct{}
 
 type RestartReloadTimerMsg struct{}
@@ -347,6 +359,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.KeyMsg:
+		// Handle paste events for URL input and search
+		if msg.Paste {
+			if m.addingURL {
+				m.urlInput += string(msg.Runes)
+				return m, nil
+			} else if m.searchMode {
+				m.searchQuery += string(msg.Runes)
+				m.filterFeedsBySearch()
+				m.cursor = 0
+				m.savedFeedCursor = 0
+				return m, nil
+			}
+		}
 		return m.handleKeyPress(msg)
 
 	case FeedListLoadedMsg:
@@ -742,6 +767,23 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, tea.Batch(cmds...)
 
+	case URLAddSuccessMsg:
+		// Set success message
+		if msg.DiscoveredURL {
+			m.statusMessage = "Added feed: " + msg.URL + " (discovered)"
+		} else {
+			m.statusMessage = "Added feed: " + msg.URL
+		}
+		m.statusMessageType = "info"
+		// Reload feed list and sync feeds
+		return m, tea.Batch(loadFeedList(m.feedManager), reloadURLsFromFile(m.feedManager))
+
+	case URLAddErrorMsg:
+		// Set error message
+		m.statusMessage = msg.Err
+		m.statusMessageType = "error"
+		return m, nil
+
 	case ErrorMsg:
 		m.err = msg.Err
 		m.refreshing = false
@@ -780,13 +822,50 @@ func (m Model) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleFeedListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	// Clear status message and quit state on any keypress (except 'q' itself)
-	if msg.String() != "q" {
+	// Clear status message and quit state on any keypress (except 'q' and 'ctrl+c' themselves)
+	key := msg.String()
+	if key != "q" && key != "ctrl+c" {
 		if m.statusMessage != "" {
 			m.statusMessage = ""
 			m.statusMessageType = ""
 		}
 		m.quitPressed = false
+		m.ctrlCPressed = false
+	}
+
+	// Handle URL adding mode separately
+	if m.addingURL {
+		switch msg.String() {
+		case "esc", "ctrl+c":
+			// Cancel URL adding
+			m.addingURL = false
+			m.urlInput = ""
+			return m, nil
+		case "enter":
+			// Submit URL
+			if m.urlInput != "" {
+				url := m.urlInput
+				m.addingURL = false
+				m.urlInput = ""
+				return m, addURLAndDiscover(m.feedManager, url)
+			}
+			// Empty input, just cancel
+			m.addingURL = false
+			return m, nil
+		case "backspace":
+			// Remove last character
+			if len(m.urlInput) > 0 {
+				m.urlInput = m.urlInput[:len(m.urlInput)-1]
+			}
+			return m, nil
+		default:
+			// Add character to URL input if it's a single character
+			key := msg.String()
+			if len(key) == 1 {
+				m.urlInput += key
+			}
+			return m, nil
+		}
 	}
 
 	// Handle search mode separately
@@ -852,8 +931,8 @@ func (m Model) handleFeedListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.savedFeedCursor = 0
 			return m, nil
 		}
-		// Otherwise, quit the app
-		return m, quitApp(m.taskManager)
+		// Otherwise, do nothing (don't quit in feed list view)
+		return m, nil
 
 	case "q":
 		// Quit confirmation: show message on first press, quit on second
@@ -866,7 +945,14 @@ func (m Model) handleFeedListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case "ctrl+c":
-		return m, quitApp(m.taskManager)
+		// Quit confirmation: show message on first press, quit on second
+		if m.ctrlCPressed {
+			return m, quitApp(m.taskManager)
+		}
+		m.ctrlCPressed = true
+		m.statusMessage = "press ctrl+c again to quit"
+		m.statusMessageType = "info"
+		return m, nil
 
 	case "ctrl+r":
 		// Reload URLs from file and sync with feeds
@@ -975,6 +1061,12 @@ func (m Model) handleFeedListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case "u":
+		// Enter URL adding mode
+		m.addingURL = true
+		m.urlInput = ""
+		return m, nil
+
+	case "U":
 		// Check if EDITOR is set
 		if config.GetEditor() == "" {
 			m.statusMessage = "Set EDITOR in your env to edit urls"
@@ -1013,15 +1105,12 @@ func (m Model) handleFeedListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m Model) handleItemListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case "ctrl+c":
-		return m, quitApp(m.taskManager)
-
 	case "h", "?":
 		m.previousState = m.state
 		m.state = HelpView
 		return m, nil
 
-	case "q", "esc":
+	case "q", "esc", "ctrl+c":
 		// Clear search mode when returning to feed list
 		m.searchMode = false
 		m.searchActive = false
@@ -1123,15 +1212,12 @@ func (m Model) handleItemListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m Model) handleArticleKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case "ctrl+c":
-		return m, quitApp(m.taskManager)
-
 	case "h", "?":
 		m.previousState = m.state
 		m.state = HelpView
 		return m, nil
 
-	case "q", "esc":
+	case "q", "esc", "ctrl+c":
 		m.state = ItemListView
 		m.cursor = m.savedItemCursor
 		m.showRawHTML = false   // Reset raw HTML view when exiting
@@ -1577,6 +1663,10 @@ func (m Model) renderFeedList() string {
 			messageStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(theme.SelectedItemColor))
 		}
 		b.WriteString(messageStyle.Render(m.statusMessage))
+	} else if m.addingURL {
+		// Show URL input modal
+		urlPrompt := "Add URL: " + m.urlInput
+		b.WriteString(m.getHelpStyle().Render(urlPrompt))
 	} else if m.searchMode {
 		searchPrompt := "/" + m.searchQuery
 		b.WriteString(m.getHelpStyle().Render(searchPrompt))
@@ -1844,15 +1934,12 @@ func (m Model) renderArticle() string {
 
 func (m Model) handleLogListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case "ctrl+c":
-		return m, quitApp(m.taskManager)
-
 	case "h", "?":
 		m.previousState = m.state
 		m.state = HelpView
 		return m, nil
 
-	case "q", "esc":
+	case "q", "esc", "ctrl+c":
 		// Clear search mode when returning to feed list
 		m.searchMode = false
 		m.searchActive = false
@@ -1907,15 +1994,12 @@ func (m Model) handleLogListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m Model) handleLogDetailKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case "ctrl+c":
-		return m, quitApp(m.taskManager)
-
 	case "h", "?":
 		m.previousState = m.state
 		m.state = HelpView
 		return m, nil
 
-	case "q", "esc":
+	case "q", "esc", "ctrl+c":
 		m.state = LogView
 		m.cursor = m.savedLogCursor
 		return m, nil
@@ -1926,15 +2010,12 @@ func (m Model) handleLogDetailKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m Model) handleTasksViewKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case "ctrl+c":
-		return m, quitApp(m.taskManager)
-
 	case "h", "?":
 		m.previousState = m.state
 		m.state = HelpView
 		return m, nil
 
-	case "q", "esc":
+	case "q", "esc", "ctrl+c":
 		// Clear search mode when returning to feed list
 		m.searchMode = false
 		m.searchActive = false
@@ -2197,10 +2278,7 @@ func (m *Model) startNextBatchOfFeeds() tea.Cmd {
 
 func (m Model) handleHelpViewKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case "ctrl+c":
-		return m, quitApp(m.taskManager)
-
-	case "q", "esc", "h", "?":
+	case "q", "esc", "h", "?", "ctrl+c":
 		// Return to previous view and reset scroll
 		m.state = m.previousState
 		m.helpViewScroll = 0
@@ -2257,11 +2335,12 @@ func (m Model) renderHelpView() string {
 	content.WriteString(fmt.Sprintf("  %-15s %s\n", "A", "Mark all items in feed as read"))
 	content.WriteString(fmt.Sprintf("  %-15s %s\n", "i", "Show feed info"))
 	content.WriteString(fmt.Sprintf("  %-15s %s\n", "/", "Search feeds"))
+	content.WriteString(fmt.Sprintf("  %-15s %s\n", "u", "Add URL (with discovery)"))
+	content.WriteString(fmt.Sprintf("  %-15s %s\n", "U", "Edit URLs in $EDITOR"))
+	content.WriteString(fmt.Sprintf("  %-15s %s\n", "ctrl+r", "Reload URLs from file"))
 	content.WriteString(fmt.Sprintf("  %-15s %s\n", "l", "View logs"))
 	content.WriteString(fmt.Sprintf("  %-15s %s\n", "t", "View tasks"))
 	content.WriteString(fmt.Sprintf("  %-15s %s\n", "c", "View settings"))
-	content.WriteString(fmt.Sprintf("  %-15s %s\n", "u", "Edit URLs in $EDITOR"))
-	content.WriteString(fmt.Sprintf("  %-15s %s\n", "ctrl+r", "Reload URLs from file"))
 	content.WriteString("\n")
 
 	// Item List View keys
@@ -2797,9 +2876,6 @@ func (m Model) handleSettingsViewKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	// Not editing - handle navigation
 	switch msg.String() {
-	case "ctrl+c":
-		return m, quitApp(m.taskManager)
-
 	case "h":
 		m.previousState = m.state
 		m.state = HelpView
@@ -2809,7 +2885,7 @@ func (m Model) handleSettingsViewKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.showSettingsHelp = !m.showSettingsHelp
 		return m, nil
 
-	case "q", "esc":
+	case "q", "esc", "ctrl+c":
 		// Clear search mode when returning to feed list
 		m.searchMode = false
 		m.searchActive = false
@@ -3218,16 +3294,13 @@ func (m Model) renderSettingsView() string {
 
 func (m Model) handleFeedInfoKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case "ctrl+c":
-		return m, quitApp(m.taskManager)
-
 	case "h", "?":
 		m.previousState = m.state
 		m.state = HelpView
 		m.helpViewScroll = 0
 		return m, nil
 
-	case "q", "esc":
+	case "q", "esc", "ctrl+c":
 		m.state = m.previousState
 		return m, nil
 	}
@@ -3237,10 +3310,7 @@ func (m Model) handleFeedInfoKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m Model) handleURLsViewKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case "ctrl+c":
-		return m, quitApp(m.taskManager)
-
-	case "q", "esc":
+	case "q", "esc", "ctrl+c":
 		m.state = m.previousState
 		m.urlsViewScroll = 0 // Reset scroll position when exiting
 		return m, nil

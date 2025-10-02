@@ -95,3 +95,142 @@ curl -L https://github.com/jarv/newsgoat/releases/latest/download/newsgoat-linux
 chmod +x newsgoat
 sudo mv newsgoat /usr/local/bin/
 ```
+
+## Add Feed URLs
+
+There are three ways to add feed URLs to NewsGoat:
+
+### 1. Via Command Line
+
+Add a feed URL directly from the command line with automatic feed discovery:
+
+```bash
+newsgoat add <url>
+```
+
+NewsGoat will automatically discover the RSS/Atom feed URL from the provided URL. For example:
+
+- `newsgoat add https://example.com` will find the feed link in the page
+- `newsgoat add https://youtube.com/@channel` will discover the YouTube RSS feed
+
+### 2. In the Application (Interactive)
+
+Press `u` in the feed list view to open an interactive prompt where you can:
+
+- Type or paste a URL
+- Press Enter to add (with automatic feed discovery)
+- Press Esc to cancel
+
+### 3. Edit the URLs File Directly
+
+Press `U` (Shift+U) in the feed list view to open `~/.config/newsgoat/urls` in your `$EDITOR`.
+
+Alternatively, edit the file manually:
+
+- Create/edit `~/.config/newsgoat/urls`
+- Add one feed URL per line
+- Lines starting with `#` are treated as comments
+- Save and press `Ctrl+R` in NewsGoat to reload
+
+Example `urls` file:
+
+```text
+# Tech News
+https://feeds.feedburner.com/techcrunch
+https://rss.cnn.com/rss/edition.rss
+
+# YouTube Channels
+https://www.youtube.com/@channel
+```
+
+## Keys
+
+### Global (Available in All Views)
+
+| Key | Description |
+|-----|-------------|
+| <kbd>h</kbd>, <kbd>?</kbd> | Show help |
+| <kbd>q</kbd> | Go back / quit (press twice in feed view) |
+| <kbd>Esc</kbd> | Go back (does nothing in feed view) |
+| <kbd>Ctrl</kbd>+<kbd>C</kbd> | Go back / quit (press twice in feed view) |
+| <kbd>j</kbd>, <kbd>↓</kbd> | Move down |
+| <kbd>k</kbd>, <kbd>↑</kbd> | Move up |
+| <kbd>Enter</kbd> | Select / open |
+| <kbd>Ctrl</kbd>+<kbd>D</kbd> | Page down |
+| <kbd>Ctrl</kbd>+<kbd>U</kbd> | Page up |
+
+### Feed List View
+
+| Key | Description |
+|-----|-------------|
+| <kbd>r</kbd> | Refresh selected feed |
+| <kbd>R</kbd> | Refresh all feeds |
+| <kbd>A</kbd> | Mark all items in feed as read |
+| <kbd>i</kbd> | Show feed info (cache-control, last-updated, etc.) |
+| <kbd>/</kbd> | Search feeds |
+| <kbd>u</kbd> | Add URL (with automatic feed discovery) |
+| <kbd>U</kbd> | Edit URLs file in $EDITOR |
+| <kbd>Ctrl</kbd>+<kbd>R</kbd> | Reload URLs from file |
+| <kbd>l</kbd> | View logs |
+| <kbd>t</kbd> | View tasks |
+| <kbd>c</kbd> | View settings |
+
+### Item List View (Articles in a Feed)
+
+| Key | Description |
+|-----|-------------|
+| <kbd>r</kbd> | Refresh current feed |
+| <kbd>R</kbd> | Refresh all feeds |
+| <kbd>A</kbd> | Mark all items as read |
+| <kbd>N</kbd> | Toggle read status of selected item |
+| <kbd>o</kbd> | Open item link in browser |
+| <kbd>c</kbd> | View settings |
+| <kbd>t</kbd> | View tasks |
+
+### Article View
+
+| Key | Description |
+|-----|-------------|
+| <kbd>1-9</kbd> | Open numbered link in browser |
+| <kbd>o</kbd> | Open article link in browser |
+| <kbd>n</kbd> | Next article |
+| <kbd>N</kbd> | Previous article |
+| <kbd>r</kbd> | Toggle raw HTML view |
+| <kbd>c</kbd> | View settings |
+| <kbd>t</kbd> | View tasks |
+
+### Tasks View
+
+| Key | Description |
+|-----|-------------|
+| <kbd>d</kbd> | Remove selected task |
+| <kbd>c</kbd> | Clear all failed tasks |
+| <kbd>l</kbd> | View logs |
+
+### Log View
+
+| Key | Description |
+|-----|-------------|
+| <kbd>c</kbd> | Clear all log messages |
+
+### Settings View
+
+| Key | Description |
+|-----|-------------|
+| <kbd>?</kbd> | Toggle settings help |
+| <kbd>Enter</kbd> | Edit selected setting |
+
+### Status Icons
+
+| Icon | Meaning |
+|------|---------|
+| 🔵 | Unread items/feed |
+| 🔍 | 404 Not Found |
+| 🚫 | 403 Forbidden |
+| ⏱️ | 429 Too Many Requests |
+| ⚠️ | 500/502/503 Server Error |
+| ⌛ | Timeout |
+| ❌ | Other Error |
+| 🕓 | Pending task |
+| 🔄 | Running task |
+| 💥 | Failed task |

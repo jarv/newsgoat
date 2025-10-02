@@ -18,8 +18,8 @@ type ViewKeyBindings struct {
 var GlobalKeys = []KeyBinding{
 	{"h, ?", "help"},
 	{"q", "quit / go back (2x in feed view)"},
-	{"esc", "quit / go back"},
-	{"ctrl+c", "force quit"},
+	{"esc", "go back (no-op in feed view)"},
+	{"ctrl+c", "go back / quit (2x in feed view)"},
 	{"j, down", "move down"},
 	{"k, up", "move up"},
 	{"enter", "select / open"},
@@ -29,7 +29,7 @@ var GlobalKeys = []KeyBinding{
 
 // View-specific key bindings
 var FeedListViewKeys = ViewKeyBindings{
-	AllowedKeys: []string{"r", "R", "l", "t", "c", "u", "i", "/"},
+	AllowedKeys: []string{"r", "R", "l", "t", "c", "U", "u", "i", "/"},
 	StatusBar: []KeyBinding{
 		{"c", "config"},
 		{"r/R", "reload"},

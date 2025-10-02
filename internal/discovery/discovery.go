@@ -24,7 +24,9 @@ func DiscoverFeed(url string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to fetch URL: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("HTTP error: %d", resp.StatusCode)
@@ -152,7 +154,9 @@ func discoverYouTubeFeed(url string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to fetch YouTube page: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("HTTP error: %d", resp.StatusCode)
