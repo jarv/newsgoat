@@ -11,6 +11,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/jarv/newsgoat/internal/config"
 	"github.com/jarv/newsgoat/internal/database"
+	"github.com/jarv/newsgoat/internal/discovery"
 	"github.com/jarv/newsgoat/internal/feeds"
 	"github.com/jarv/newsgoat/internal/logging"
 	"github.com/jarv/newsgoat/internal/tasks"
@@ -32,6 +33,14 @@ func setupLogging(queries *database.Queries) {
 }
 
 func main() {
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "Usage: newsgoat [options] [command]\n\n")
+		fmt.Fprintf(os.Stderr, "Commands:\n")
+		fmt.Fprintf(os.Stderr, "  add <url>    Add a feed URL to the URLs file\n\n")
+		fmt.Fprintf(os.Stderr, "Options:\n")
+		flag.PrintDefaults()
+	}
+
 	var feedTest = flag.Bool("feedTest", false, "Run feed test harness server")
 	var showVersion = flag.Bool("version", false, "Show version information")
 	var urlFile = flag.String("u", "", "Path to URL file (overrides default location)")
@@ -51,10 +60,52 @@ func main() {
 		return
 	}
 
+	// Check for subcommands
+	args := flag.Args()
+	if len(args) > 0 {
+		switch args[0] {
+		case "add":
+			if len(args) < 2 {
+				fmt.Fprintf(os.Stderr, "Error: 'add' command requires a URL argument\n")
+				fmt.Fprintf(os.Stderr, "Usage: newsgoat add <url>\n")
+				os.Exit(1)
+			}
+			if err := addURL(args[1]); err != nil {
+				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+				os.Exit(1)
+			}
+			return
+		default:
+			fmt.Fprintf(os.Stderr, "Error: unknown command '%s'\n", args[0])
+			os.Exit(1)
+		}
+	}
+
 	if err := run(*urlFile); err != nil {
 		fmt.Fprintf(os.Stderr, "2Error: %v\n", err)
 		os.Exit(1)
 	}
+}
+
+func addURL(urlArg string) error {
+	// Try to discover the feed URL
+	fmt.Printf("Discovering feed URL from: %s\n", urlArg)
+	feedURL, err := discovery.DiscoverFeed(urlArg)
+	if err != nil {
+		return fmt.Errorf("failed to discover feed: %w", err)
+	}
+
+	if feedURL != urlArg {
+		fmt.Printf("Discovered feed URL: %s\n", feedURL)
+	}
+
+	// Add the URL to the URLs file
+	if err := config.AddURL(feedURL); err != nil {
+		return fmt.Errorf("failed to add URL to file: %w", err)
+	}
+
+	fmt.Printf("Successfully added feed: %s\n", feedURL)
+	return nil
 }
 
 func run(urlFile string) error {

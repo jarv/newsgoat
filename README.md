@@ -25,7 +25,7 @@ After approximately 1 day of prompting and making adjustments as I vibed through
 - Logs are shown directly in the UI
 - Refresh task control separate in the app with a way to see what is queued, running and failures
 - Option to put feeds with unread items at the top
-- Automatic feed discovery
+- Automatic feed discovery when adding URLs
 
 ## Design Principles
 
