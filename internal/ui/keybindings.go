@@ -17,11 +17,14 @@ type ViewKeyBindings struct {
 // Global key bindings that work in all views
 var GlobalKeys = []KeyBinding{
 	{"h, ?", "help"},
-	{"q, esc", "quit / go back"},
+	{"q", "quit / go back (2x in feed view)"},
+	{"esc", "quit / go back"},
+	{"ctrl+c", "force quit"},
 	{"j, down", "move down"},
 	{"k, up", "move up"},
 	{"enter", "select / open"},
-	{"ctrl+c", "quit"},
+	{"ctrl+d", "page down"},
+	{"ctrl+u", "page up"},
 }
 
 // View-specific key bindings

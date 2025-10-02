@@ -275,6 +275,10 @@ type AllItemsMarkedReadMsg struct {
 	FeedID int64
 }
 
+type ItemReadStatusToggledMsg struct {
+	ItemID int64
+}
+
 type ReloadTimerMsg struct{}
 
 type RestartReloadTimerMsg struct{}
@@ -729,6 +733,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		return m, tea.Batch(cmds...)
 
+	case ItemReadStatusToggledMsg:
+		// Item read status was toggled, reload the item list and feed list
+		var cmds []tea.Cmd
+		cmds = append(cmds, loadFeedList(m.feedManager))
+		if m.state == ItemListView {
+			cmds = append(cmds, loadItemList(m.feedManager, m.selectedFeed))
+		}
+		return m, tea.Batch(cmds...)
+
 	case ErrorMsg:
 		m.err = msg.Err
 		m.refreshing = false
@@ -1073,6 +1086,13 @@ func (m Model) handleItemListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "A":
 		// Mark all items in the current feed as read
 		return m, markAllItemsReadInFeed(m.feedManager, m.selectedFeed)
+
+	case "N":
+		// Toggle read status of current item
+		if len(m.itemList) > 0 && m.cursor < len(m.itemList) {
+			item := m.itemList[m.cursor]
+			return m, toggleItemReadStatus(m.feedManager, item.ID, item.Read)
+		}
 
 	case "o":
 		// Open the current item's link in the browser
@@ -2234,6 +2254,9 @@ func (m Model) renderHelpView() string {
 	content.WriteString("Feed List View\n")
 	content.WriteString(fmt.Sprintf("  %-15s %s\n", "r", "Refresh selected feed"))
 	content.WriteString(fmt.Sprintf("  %-15s %s\n", "R", "Refresh all feeds"))
+	content.WriteString(fmt.Sprintf("  %-15s %s\n", "A", "Mark all items in feed as read"))
+	content.WriteString(fmt.Sprintf("  %-15s %s\n", "i", "Show feed info"))
+	content.WriteString(fmt.Sprintf("  %-15s %s\n", "/", "Search feeds"))
 	content.WriteString(fmt.Sprintf("  %-15s %s\n", "l", "View logs"))
 	content.WriteString(fmt.Sprintf("  %-15s %s\n", "t", "View tasks"))
 	content.WriteString(fmt.Sprintf("  %-15s %s\n", "c", "View settings"))
@@ -2246,6 +2269,10 @@ func (m Model) renderHelpView() string {
 	content.WriteString(fmt.Sprintf("  %-15s %s\n", "r", "Refresh feed"))
 	content.WriteString(fmt.Sprintf("  %-15s %s\n", "R", "Refresh all feeds"))
 	content.WriteString(fmt.Sprintf("  %-15s %s\n", "A", "Mark all items as read"))
+	content.WriteString(fmt.Sprintf("  %-15s %s\n", "N", "Toggle read status of item"))
+	content.WriteString(fmt.Sprintf("  %-15s %s\n", "o", "Open item link in browser"))
+	content.WriteString(fmt.Sprintf("  %-15s %s\n", "c", "View settings"))
+	content.WriteString(fmt.Sprintf("  %-15s %s\n", "t", "View tasks"))
 	content.WriteString("\n")
 
 	// Article View keys
@@ -2255,6 +2282,8 @@ func (m Model) renderHelpView() string {
 	content.WriteString(fmt.Sprintf("  %-15s %s\n", "n", "Next article"))
 	content.WriteString(fmt.Sprintf("  %-15s %s\n", "N", "Previous article"))
 	content.WriteString(fmt.Sprintf("  %-15s %s\n", "r", "Toggle raw HTML view"))
+	content.WriteString(fmt.Sprintf("  %-15s %s\n", "c", "View settings"))
+	content.WriteString(fmt.Sprintf("  %-15s %s\n", "t", "View tasks"))
 	content.WriteString("\n")
 
 	// Settings View keys
@@ -2274,27 +2303,15 @@ func (m Model) renderHelpView() string {
 	content.WriteString(fmt.Sprintf("  %-15s %s\n", "c", "Clear all log messages"))
 	content.WriteString("\n")
 
-	// Status icons legend
+	// Status icons legend - unified section
 	content.WriteString("Status Icons\n")
-	content.WriteString("\n")
-	content.WriteString("Feed List View:\n")
-	content.WriteString("  🔵              Feed has unread items\n")
-	content.WriteString("  (no icon)       All items read\n")
-	content.WriteString("  🔄 ⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏   Refreshing feed\n")
-	content.WriteString("\n")
-	content.WriteString("Feed Errors:\n")
+	content.WriteString("  🔵              Unread items/feed\n")
 	content.WriteString("  🔍              404 Not Found\n")
 	content.WriteString("  🚫              403 Forbidden\n")
 	content.WriteString("  ⏱️              429 Too Many Requests\n")
 	content.WriteString("  ⚠️              500/502/503 Server Error\n")
 	content.WriteString("  ⌛              Timeout\n")
 	content.WriteString("  ❌              Other Error\n")
-	content.WriteString("\n")
-	content.WriteString("Item List View:\n")
-	content.WriteString("  🔵              Unread item\n")
-	content.WriteString("  (no icon)       Read item\n")
-	content.WriteString("\n")
-	content.WriteString("Tasks View:\n")
 	content.WriteString("  🕓              Pending task\n")
 	content.WriteString("  🔄              Running task\n")
 	content.WriteString("  💥              Failed task\n")

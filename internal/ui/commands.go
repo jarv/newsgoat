@@ -140,6 +140,24 @@ func markAllItemsReadInFeed(feedManager *feeds.Manager, feedID int64) tea.Cmd {
 	}
 }
 
+func toggleItemReadStatus(feedManager *feeds.Manager, itemID int64, currentlyRead bool) tea.Cmd {
+	return func() tea.Msg {
+		var err error
+		if currentlyRead {
+			// If currently read, mark as unread
+			err = feedManager.MarkItemUnread(itemID)
+		} else {
+			// If currently unread, mark as read
+			err = feedManager.MarkItemRead(itemID)
+		}
+		if err != nil {
+			logging.Error("Error toggling item read status", "itemID", itemID, "error", err)
+			return ErrorMsg{Err: err}
+		}
+		return ItemReadStatusToggledMsg{ItemID: itemID}
+	}
+}
+
 func openLink(url string) tea.Cmd {
 	return func() tea.Msg {
 		var cmd *exec.Cmd
