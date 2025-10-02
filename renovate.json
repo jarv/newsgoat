@@ -16,6 +16,7 @@
       "matchPackagePatterns": [
         "*"
       ],
+      "allowedVersions": "!/(alpha|beta|rc)/i",
       "ignoreUnstable": true
     }
   ]
