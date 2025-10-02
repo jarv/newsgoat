@@ -6,7 +6,7 @@ require (
 	github.com/JohannesKaufmann/html-to-markdown/v2 v2.4.0
 	github.com/charmbracelet/bubbletea v1.3.10
 	github.com/charmbracelet/glamour v0.10.0
-	github.com/charmbracelet/lipgloss v1.1.1-0.20250404203927-76690c660834
+	github.com/charmbracelet/lipgloss v1.1.1-0.20250908092053-970a4b8c752f
 	github.com/charmbracelet/lipgloss/v2 v2.0.0-beta.3
 	github.com/google/uuid v1.6.0
 	github.com/mmcdole/gofeed v1.3.0
