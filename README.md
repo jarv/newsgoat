@@ -13,7 +13,7 @@ It's inspired by [Newsbeuter](https://github.com/akrennmair/newsbeuter)/[Newsboa
 I've been viewing RSS feeds in my terminal for about 15 years.
 The first terminal program used was [Newsbeuter](https://github.com/akrennmair/newsbeuter).
 Around 2017, the maintainer said it would no longer be maintained so I switched to a fork that was renamed to [Newsboat](https://github.com/newsboat/newsboat).
-Getting a bit frustrated with frequent crashes, I looked for an alternatives.
+Getting a bit frustrated with frequent segfaults, especially after the Rust rewrite, I looked for an alternatives.
 The project [nom](https://github.com/guyfedwards/nom) looked interesting but didn't quite have [the feed organization](https://github.com/guyfedwards/nom/issues/106) layout that I wanted.
 Now the kids are vibe coding and it looked like a fun way to test out how quickly I could create my own news reader in a language I know (Go) implementing the exact features I want.
 After approximately 1 day of prompting and making adjustments as I vibed through it, this is the result, enjoy!
@@ -29,7 +29,8 @@ After approximately 1 day of prompting and making adjustments as I vibed through
 
 ## Design Principles
 
-- **Opinionated**: It was built with my preferred configuration for Newsboat in mind.
+- **Beautiful and compact**: Compact design and tactful use of emojis.
+- **Opinionated**: It was built with one (my own) preferred configuration for Newsboat in mind, it is not as configurable as the alternatives.
 - **A good "netizen"**: It follows [feed reader best practices](https://rachelbythebay.com/fs/help.html), including
   - respecting cache-control sent by the feed server
   - sending conditional responses
