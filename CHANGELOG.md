@@ -1,3 +1,12 @@
+# [1.2.0](https://github.com/jarv/newsgoat/compare/v1.1.2...v1.2.0) (2025-10-02)
+
+
+### Features
+
+* Adds shift-n to toggle read status on items ([e91b31e](https://github.com/jarv/newsgoat/commit/e91b31ed54e98acdb4f5c9cf64311ab8cf77af8e))
+* Adds the 'add' command to add urls to the feed ([31eedc7](https://github.com/jarv/newsgoat/commit/31eedc795a3dfc995df0ac42668d592724e0cb3d))
+* Adds URL reloading ([5f843ba](https://github.com/jarv/newsgoat/commit/5f843bad1a5e31614488f203dad2576bb9033baa))
+
 ## [1.1.2](https://github.com/jarv/newsgoat/compare/v1.1.1...v1.1.2) (2025-10-02)
 
 
