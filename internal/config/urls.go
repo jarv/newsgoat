@@ -7,6 +7,11 @@ import (
 	"strings"
 )
 
+// GetEditor returns the editor to use from the EDITOR environment variable
+func GetEditor() string {
+	return os.Getenv("EDITOR")
+}
+
 func GetURLsFilePath() (string, error) {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {

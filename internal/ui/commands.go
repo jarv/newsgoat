@@ -233,3 +233,94 @@ func loadFeedInfo(queries *database.Queries, feedID int64) tea.Cmd {
 	}
 }
 
+func reloadURLsFromFile(feedManager *feeds.Manager) tea.Cmd {
+	return func() tea.Msg {
+		urls, err := config.ReadURLsFile()
+		if err != nil {
+			logging.Error("reloadURLsFromFile failed", "error", err)
+			return ErrorMsg{Err: err}
+		}
+		urlsPath, pathErr := config.GetURLsFilePath()
+		if pathErr != nil {
+			urlsPath = ""
+		}
+		return URLsReloadedMsg{URLs: urls, FilePath: urlsPath}
+	}
+}
+
+func openURLsFileInEditor() tea.Cmd {
+	editor := config.GetEditor()
+	if editor == "" {
+		return func() tea.Msg {
+			return EditorErrorMsg{Err: "EDITOR environment variable is not set"}
+		}
+	}
+
+	urlsPath, err := config.GetURLsFilePath()
+	if err != nil {
+		logging.Error("openURLsFileInEditor: failed to get URLs file path", "error", err)
+		return func() tea.Msg {
+			return EditorErrorMsg{Err: "Failed to get URLs file path: " + err.Error()}
+		}
+	}
+
+	c := exec.Command(editor, urlsPath)
+	return tea.ExecProcess(c, func(err error) tea.Msg {
+		if err != nil {
+			logging.Error("openURLsFileInEditor: editor command failed", "editor", editor, "error", err)
+			return EditorErrorMsg{Err: "Failed to open editor: " + err.Error()}
+		}
+		return EditorFinishedMsg{}
+	})
+}
+
+func syncFeedsWithURLs(feedManager *feeds.Manager, urls []string) tea.Cmd {
+	return func() tea.Msg {
+		// Get all feeds from database
+		allFeeds, err := feedManager.GetAllFeeds()
+		if err != nil {
+			logging.Error("syncFeedsWithURLs: failed to get all feeds", "error", err)
+			return ErrorMsg{Err: err}
+		}
+
+		// Create a set of URLs from the file for quick lookup
+		urlsFromFileSet := make(map[string]bool)
+		for _, url := range urls {
+			urlsFromFileSet[url] = true
+		}
+
+		// Create a set of URLs from DB for quick lookup
+		urlsFromDBSet := make(map[string]bool)
+		for _, feed := range allFeeds {
+			urlsFromDBSet[feed.Url] = true
+		}
+
+		// Hide feeds that are in DB but not in URLs file
+		for _, feed := range allFeeds {
+			if !urlsFromFileSet[feed.Url] {
+				if err := feedManager.HideFeedByURL(feed.Url); err != nil {
+					logging.Warn("Failed to hide feed", "url", feed.Url, "error", err)
+				}
+			}
+		}
+
+		// Show/Add feeds that are in URLs file
+		for _, url := range urls {
+			if urlsFromDBSet[url] {
+				// Feed exists in DB, make sure it's visible
+				if err := feedManager.ShowFeedByURL(url); err != nil {
+					logging.Warn("Failed to show feed", "url", url, "error", err)
+				}
+			} else {
+				// Feed doesn't exist, add it without fetching
+				if err := feedManager.AddFeedWithoutFetching(url); err != nil {
+					logging.Warn("Failed to add feed", "url", url, "error", err)
+				}
+			}
+		}
+
+		// Reload feed list after syncing
+		return loadFeedList(feedManager)()
+	}
+}
+

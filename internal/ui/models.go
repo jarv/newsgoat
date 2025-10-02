@@ -196,6 +196,9 @@ type Model struct {
 	searchQuery                     string         // Current search query text
 	searchActive                    bool           // Track if feeds are currently filtered by search
 	unfilteredFeedList              []database.GetFeedStatsRow // Feed list before search filtering
+	statusMessage                   string         // Message to display above status bar
+	statusMessageType               string         // Type of message: "error" or "info"
+	quitPressed                     bool           // Track if 'q' was pressed once (for quit confirmation)
 }
 
 type RefreshMsg struct {
@@ -251,6 +254,17 @@ type TaskListLoadedMsg struct {
 type URLsListLoadedMsg struct {
 	URLs     []string
 	FilePath string
+}
+
+type URLsReloadedMsg struct {
+	URLs     []string
+	FilePath string
+}
+
+type EditorFinishedMsg struct{}
+
+type EditorErrorMsg struct {
+	Err string
 }
 
 type FeedInfoLoadedMsg struct {
@@ -434,6 +448,23 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case URLsListLoadedMsg:
 		m.urlsList = msg.URLs
 		m.urlsFilePath = msg.FilePath
+		return m, nil
+
+	case URLsReloadedMsg:
+		m.urlsList = msg.URLs
+		// Set info message
+		m.statusMessage = "urls reloaded from " + msg.FilePath
+		m.statusMessageType = "info"
+		// Sync feeds with the reloaded URLs
+		return m, syncFeedsWithURLs(m.feedManager, msg.URLs)
+
+	case EditorFinishedMsg:
+		// After editor closes, reload URLs and sync feeds
+		return m, reloadURLsFromFile(m.feedManager)
+
+	case EditorErrorMsg:
+		// Display error message
+		m.err = fmt.Errorf("%s", msg.Err)
 		return m, nil
 
 	case FeedInfoLoadedMsg:
@@ -736,6 +767,15 @@ func (m Model) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleFeedListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// Clear status message and quit state on any keypress (except 'q' itself)
+	if msg.String() != "q" {
+		if m.statusMessage != "" {
+			m.statusMessage = ""
+			m.statusMessageType = ""
+		}
+		m.quitPressed = false
+	}
+
 	// Handle search mode separately
 	if m.searchMode {
 		switch msg.String() {
@@ -802,8 +842,22 @@ func (m Model) handleFeedListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// Otherwise, quit the app
 		return m, quitApp(m.taskManager)
 
-	case "q", "ctrl+c":
+	case "q":
+		// Quit confirmation: show message on first press, quit on second
+		if m.quitPressed {
+			return m, quitApp(m.taskManager)
+		}
+		m.quitPressed = true
+		m.statusMessage = "press q again to quit"
+		m.statusMessageType = "info"
+		return m, nil
+
+	case "ctrl+c":
 		return m, quitApp(m.taskManager)
+
+	case "ctrl+r":
+		// Reload URLs from file and sync with feeds
+		return m, reloadURLsFromFile(m.feedManager)
 
 	case "h", "?":
 		m.previousState = m.state
@@ -908,9 +962,14 @@ func (m Model) handleFeedListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case "u":
-		m.previousState = m.state
-		m.state = URLsView
-		return m, loadURLsList()
+		// Check if EDITOR is set
+		if config.GetEditor() == "" {
+			m.statusMessage = "Set EDITOR in your env to edit urls"
+			m.statusMessageType = "error"
+			return m, nil
+		}
+		// Open URLs file in editor
+		return m, openURLsFileInEditor()
 
 	case "i":
 		// Show feed info
@@ -1037,11 +1096,6 @@ func (m Model) handleItemListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.cursor = 0
 		m.savedTasksCursor = 0
 		return m, loadTaskList(m.taskManager)
-
-	case "u":
-		m.previousState = m.state
-		m.state = URLsView
-		return m, loadURLsList()
 	}
 
 	return m, nil
@@ -1177,11 +1231,6 @@ func (m Model) handleArticleKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.cursor = 0
 		m.savedTasksCursor = 0
 		return m, loadTaskList(m.taskManager)
-
-	case "u":
-		m.previousState = m.state
-		m.state = URLsView
-		return m, loadURLsList()
 
 	case "1", "2", "3", "4", "5", "6", "7", "8", "9":
 		linkNum := int(msg.String()[0] - '1')
@@ -1351,9 +1400,18 @@ func (m Model) renderFeedList() string {
 		}
 		b.WriteString(strings.Repeat("\n", padding))
 		b.WriteString(statusBar)
-		// Always show search line (either with prompt or empty)
+		// Show status message line or search line
 		b.WriteString("\n")
-		if m.searchMode {
+		if m.statusMessage != "" {
+			theme := themes.GetThemeByName(m.config.ThemeName)
+			var messageStyle lipgloss.Style
+			if m.statusMessageType == "error" {
+				messageStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("9")) // Red
+			} else {
+				messageStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(theme.SelectedItemColor))
+			}
+			b.WriteString(messageStyle.Render(m.statusMessage))
+		} else if m.searchMode {
 			searchPrompt := "/" + m.searchQuery
 			b.WriteString(m.getHelpStyle().Render(searchPrompt))
 		}
@@ -1488,9 +1546,18 @@ func (m Model) renderFeedList() string {
 
 	b.WriteString(statusBar)
 
-	// Always show search line (either with prompt or empty)
+	// Show status message line above search line if present
 	b.WriteString("\n")
-	if m.searchMode {
+	if m.statusMessage != "" {
+		theme := themes.GetThemeByName(m.config.ThemeName)
+		var messageStyle lipgloss.Style
+		if m.statusMessageType == "error" {
+			messageStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("9")) // Red
+		} else {
+			messageStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(theme.SelectedItemColor))
+		}
+		b.WriteString(messageStyle.Render(m.statusMessage))
+	} else if m.searchMode {
 		searchPrompt := "/" + m.searchQuery
 		b.WriteString(m.getHelpStyle().Render(searchPrompt))
 	}
@@ -2170,7 +2237,8 @@ func (m Model) renderHelpView() string {
 	content.WriteString(fmt.Sprintf("  %-15s %s\n", "l", "View logs"))
 	content.WriteString(fmt.Sprintf("  %-15s %s\n", "t", "View tasks"))
 	content.WriteString(fmt.Sprintf("  %-15s %s\n", "c", "View settings"))
-	content.WriteString(fmt.Sprintf("  %-15s %s\n", "u", "View URLs"))
+	content.WriteString(fmt.Sprintf("  %-15s %s\n", "u", "Edit URLs in $EDITOR"))
+	content.WriteString(fmt.Sprintf("  %-15s %s\n", "ctrl+r", "Reload URLs from file"))
 	content.WriteString("\n")
 
 	// Item List View keys
