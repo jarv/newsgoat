@@ -11,16 +11,29 @@ import (
 )
 
 type DatabaseHandler struct {
-	queries *database.Queries
+	queries      *database.Queries
+	debugEnabled bool
 }
 
 func NewDatabaseHandler(queries *database.Queries) *DatabaseHandler {
 	return &DatabaseHandler{
-		queries: queries,
+		queries:      queries,
+		debugEnabled: false,
 	}
 }
 
-func (h *DatabaseHandler) Enabled(_ context.Context, _ slog.Level) bool {
+func NewDatabaseHandlerWithDebug(queries *database.Queries, debug bool) *DatabaseHandler {
+	return &DatabaseHandler{
+		queries:      queries,
+		debugEnabled: debug,
+	}
+}
+
+func (h *DatabaseHandler) Enabled(_ context.Context, level slog.Level) bool {
+	// Filter out debug messages unless debug mode is enabled
+	if level == slog.LevelDebug && !h.debugEnabled {
+		return false
+	}
 	return true
 }
 

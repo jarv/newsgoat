@@ -24,8 +24,8 @@ var schemaSQL string
 
 var logger *slog.Logger
 
-func setupLogging(queries *database.Queries) {
-	slogHandler := logging.NewDatabaseHandler(queries)
+func setupLogging(queries *database.Queries, debug bool) {
+	slogHandler := logging.NewDatabaseHandlerWithDebug(queries, debug)
 	logger = slog.New(slogHandler)
 
 	// Set the global logger for other packages
@@ -43,6 +43,7 @@ func main() {
 
 	var feedTest = flag.Bool("feedTest", false, "Run feed test harness server")
 	var showVersion = flag.Bool("version", false, "Show version information")
+	var debug = flag.Bool("debug", false, "Enable debug logging")
 	var urlFile = flag.String("u", "", "Path to URL file (overrides default location)")
 	flag.StringVar(urlFile, "urlFile", "", "Path to URL file (overrides default location)")
 	flag.Parse()
@@ -81,7 +82,7 @@ func main() {
 		}
 	}
 
-	if err := run(*urlFile); err != nil {
+	if err := run(*urlFile, *debug); err != nil {
 		fmt.Fprintf(os.Stderr, "2Error: %v\n", err)
 		os.Exit(1)
 	}
@@ -108,7 +109,7 @@ func addURL(urlArg string) error {
 	return nil
 }
 
-func run(urlFile string) error {
+func run(urlFile string, debug bool) error {
 	// Initialize database first
 	db, queries, err := database.InitDBWithSchema(schemaSQL)
 	if err != nil {
@@ -123,7 +124,7 @@ func run(urlFile string) error {
 	}
 
 	// Setup logging after database is initialized
-	setupLogging(queries)
+	setupLogging(queries, debug)
 	defer func() {
 		if closeErr := db.Close(); closeErr != nil {
 			logger.Error("Error closing database", "error", closeErr)
