@@ -1,3 +1,10 @@
+# [1.4.0](https://github.com/jarv/newsgoat/compare/v1.3.0...v1.4.0) (2025-10-03)
+
+
+### Features
+
+* Changes default reload concurrency from 2 to 4 ([0ffbdc8](https://github.com/jarv/newsgoat/commit/0ffbdc8e48b1c8b69aaa609de6dbb9ecb851c371))
+
 # [1.3.0](https://github.com/jarv/newsgoat/compare/v1.2.0...v1.3.0) (2025-10-02)
 
 
