@@ -12,7 +12,7 @@ It's inspired by [Newsbeuter](https://github.com/akrennmair/newsbeuter)/[Newsboa
 
 I’ve been using terminal-based RSS readers for about 15 years.
 The first program I used was [Newsbeuter](https://github.com/akrennmair/newsbeuter), but around 2017 its maintainer announced it would no longer be maintained, so I switched to its fork, [Newsboat](https://github.com/newsboat/newsboat).
-Over time, I grew frustrated with frequent segfaults, especially after the Rust rewrite, and started looking for alternatives. A similar CLI RSS reader written in Go called [nom](https://github.com/guyfedwards/nom) looked interesting, but it didn’t offer the feed organization I wanted.
+Over time, I grew frustrated with frequent crashes and started looking for alternatives. A similar CLI RSS reader written in Go called [nom](https://github.com/guyfedwards/nom) looked interesting, but it didn’t offer the feed organization I wanted.
 
 Meanwhile, “vibe coding” was catching on, and it seemed like a fun excuse to see how quickly I could build my own news reader in Go with exactly the features I wanted. After about a day of prompting, tweaking, and vibing through the process, here’s the result—enjoy!
 
@@ -29,13 +29,13 @@ Meanwhile, “vibe coding” was catching on, and it seemed like a fun excuse to
 
 - **Beautiful and compact**: Compact design and tactful use of emojis.
 - **Opinionated**: It was built with one (my own) preferred configuration for Newsboat in mind, it is not as configurable as the alternatives.
-- **A good "netizen"**: It follows [feed reader best practices](https://rachelbythebay.com/fs/help.html), including
-  - respecting cache-control sent by the feed server
-  - sending conditional responses
-  - setting a useful user-agent
+- **A good "netizen"**: It follows [rachelbythebay](https://rachelbythebay.com/) [feed reader best practices](https://rachelbythebay.com/fs/help.html).
+  - sends conditional responses
+  - respects `cache-control` and will use the local cache instead instead of a conditional response
+  - sets a useful user-agent
 - **Local only**: There are no current plans for cloud syncing, sorry!
 - **URLs as plain text**: I am not a fan of yaml based configuration so feed URLs are in a plain text file similar to Newsboat
-- **Configuration in the UI**: For what little configuraiton there is, it is set in the UI instead of through a configuration file
+- **Configuration in the UI**: For what little configuration there is, it is set in the UI instead of through a configuration file
 
 ## Alternatives
 
