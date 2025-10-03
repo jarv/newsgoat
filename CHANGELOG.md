@@ -1,3 +1,10 @@
+# [1.5.0](https://github.com/jarv/newsgoat/compare/v1.4.0...v1.5.0) (2025-10-03)
+
+
+### Features
+
+* Updates defaults and improves first-run ([199bcb1](https://github.com/jarv/newsgoat/commit/199bcb1c7c123332c61026bb53eb348d7d42cb91))
+
 # [1.4.0](https://github.com/jarv/newsgoat/compare/v1.3.0...v1.4.0) (2025-10-03)
 
 
