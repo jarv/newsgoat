@@ -18,12 +18,12 @@ Meanwhile, “vibe coding” was catching on, and it seemed like a fun excuse to
 
 ## Features
 
-- Feeds are organized by site
-- Quickly query info for every feed including cache-control, last-updated, etc
-- Logs are shown directly in the UI
-- Refresh task control separate in the app with a way to see what is queued, running and failures
-- Option to put feeds with unread items at the top
-- Automatic feed discovery when adding URLs
+- Feeds are grouped by the feed URL.
+- Quickly query info for every feed including cache-control, last-updated, etc. Press <kbd>i</kbd> to view feed info.
+- Error logs are shown directly in the UI for feed troubleshooting. Press <kbd>l</kbd> to view logs.
+- Refresh task control separate in the app with a way to see what is queued, running and failures. Press <kbd>t</kbd> to view tasks.
+- Option to put feeds with unread items at the top. Press <kbd>c</kbd> to configure.
+- Automatic feed discovery when adding URLs. Press <kbd>u</kbd> to add a youtube link and automatically subscribe to the channel's feed.
 
 ## Design Principles
 
