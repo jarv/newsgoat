@@ -95,7 +95,7 @@ sudo mv newsgoat /usr/local/bin/
 
 </details>
 
-### Linux (amd64 / arm64)
+#### Linux (amd64 / arm64)
 
 <details>
 
@@ -113,9 +113,11 @@ sudo mv newsgoat /usr/local/bin/
 curl -L https://github.com/jarv/newsgoat/releases/latest/download/newsgoat-linux-arm64 -o newsgoat
 chmod +x newsgoat
 sudo mv newsgoat /usr/local/bin/
-```## Add Feed URLs
+```
 
 </details>
+
+## Add Feed URLs
 
 There are three ways to add feed URLs to NewsGoat:
 
