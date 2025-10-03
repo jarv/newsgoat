@@ -1,6 +1,6 @@
 # NewsGoat
 
-<p align="left">
+<p align="center">
   <img src="./.github/screenshot.png" alt="newsgoat screenshot" height="200">
   <img src="./.github/newsgoat.png" alt="newsgoat icon" height="200">
 </p>
@@ -58,31 +58,64 @@ go run . -urlFile urls.example # Run using the example urls file
 
 ## Install
 
-Download the latest release for your platform from the [releases page](https://github.com/jarv/newsgoat/releases):
+### Quick Install (Recommended)
 
-### macOS
+Install with a single command (macOS and Linux):
 
 ```bash
-# For Apple Silicon
+curl -sSL https://raw.githubusercontent.com/jarv/newsgoat/main/install.sh | bash
+```
+
+This will automatically detect your OS and architecture and install the latest version to `/usr/local/bin`.
+
+### Manual Install
+
+Download the latest release for your platform from the [releases page](https://github.com/jarv/newsgoat/releases):
+
+#### macOS (Apple Silicon / Intel)
+
+<details>
+
+**Apple Silicon**
+
+```bash
+# Apple Silicon
 curl -L https://github.com/jarv/newsgoat/releases/latest/download/newsgoat-darwin-arm64 -o newsgoat
-# For Intel
+chmod +x newsgoat
+sudo mv newsgoat /usr/local/bin/
+```
+
+**Intel**
+
+```bash
 curl -L https://github.com/jarv/newsgoat/releases/latest/download/newsgoat-darwin-amd64 -o newsgoat
 chmod +x newsgoat
 sudo mv newsgoat /usr/local/bin/
 ```
 
-### Linux
+</details>
+
+### Linux (amd64 / arm64)
+
+<details>
+
+**amd64**
 
 ```bash
-# For amd64
 curl -L https://github.com/jarv/newsgoat/releases/latest/download/newsgoat-linux-amd64 -o newsgoat
-# For arm64
-curl -L https://github.com/jarv/newsgoat/releases/latest/download/newsgoat-linux-arm64 -o newsgoat
 chmod +x newsgoat
 sudo mv newsgoat /usr/local/bin/
 ```
 
-## Add Feed URLs
+**arm64**
+
+```bash
+curl -L https://github.com/jarv/newsgoat/releases/latest/download/newsgoat-linux-arm64 -o newsgoat
+chmod +x newsgoat
+sudo mv newsgoat /usr/local/bin/
+```## Add Feed URLs
+
+</details>
 
 There are three ways to add feed URLs to NewsGoat:
 
