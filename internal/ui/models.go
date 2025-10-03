@@ -164,44 +164,44 @@ type Model struct {
 	err                             error
 	refreshing                      bool
 	refreshStatus                   string
-	refreshingFeeds                 map[int64]bool // Track which feeds are currently refreshing
-	pendingFeeds                    []int64        // Feeds waiting to be refreshed (for refresh-all)
-	maxConcurrency                  int            // Max concurrent refreshes allowed
-	spinnerFrame                    int            // Current spinner animation frame
-	spinnerRunning                  bool           // Track if spinner timer is already running
-	firstAutoReload                 bool           // Track if this is the first auto reload (for SuppressFirstReload)
-	pendingStartupReload            bool           // Track if we need to reload on startup after feed list loads
-	nextReloadTime                  time.Time      // Time when next auto reload is scheduled
-	editingSettings                 bool           // Track if we're editing a setting
-	selectingTheme                  bool           // Track if we're selecting a theme
-	selectingHighlight              bool           // Track if we're selecting a highlight style
-	selectingSpinner                bool           // Track if we're selecting a spinner type
-	selectingShowReadFeeds          bool           // Track if we're selecting show read feeds
-	selectingAutoReload             bool           // Track if we're selecting auto reload
-	selectingSuppressFirstReload    bool           // Track if we're selecting suppress first reload
-	selectingReloadOnStartup        bool           // Track if we're selecting reload on startup
-	selectingUnreadOnTop            bool           // Track if we're selecting unread on top
-	showRawHTML                     bool           // Track if showing raw HTML in article view
-	themeSelectCursor               int            // Cursor position in theme selector
-	highlightSelectCursor           int            // Cursor position in highlight style selector
-	spinnerSelectCursor             int            // Cursor position in spinner type selector
-	showReadFeedsSelectCursor       int            // Cursor position in show read feeds selector
-	autoReloadSelectCursor          int            // Cursor position in auto reload selector
-	suppressFirstReloadSelectCursor int            // Cursor position in suppress first reload selector
-	reloadOnStartupSelectCursor     int            // Cursor position in reload on startup selector
-	unreadOnTopSelectCursor         int            // Cursor position in unread on top selector
-	settingInput                    string         // Current input value when editing
-	showSettingsHelp                bool           // Track if we're showing settings help
-	searchMode                      bool           // Track if search mode is active
-	searchQuery                     string         // Current search query text
-	searchActive                    bool           // Track if feeds are currently filtered by search
+	refreshingFeeds                 map[int64]bool             // Track which feeds are currently refreshing
+	pendingFeeds                    []int64                    // Feeds waiting to be refreshed (for refresh-all)
+	maxConcurrency                  int                        // Max concurrent refreshes allowed
+	spinnerFrame                    int                        // Current spinner animation frame
+	spinnerRunning                  bool                       // Track if spinner timer is already running
+	firstAutoReload                 bool                       // Track if this is the first auto reload (for SuppressFirstReload)
+	pendingStartupReload            bool                       // Track if we need to reload on startup after feed list loads
+	nextReloadTime                  time.Time                  // Time when next auto reload is scheduled
+	editingSettings                 bool                       // Track if we're editing a setting
+	selectingTheme                  bool                       // Track if we're selecting a theme
+	selectingHighlight              bool                       // Track if we're selecting a highlight style
+	selectingSpinner                bool                       // Track if we're selecting a spinner type
+	selectingShowReadFeeds          bool                       // Track if we're selecting show read feeds
+	selectingAutoReload             bool                       // Track if we're selecting auto reload
+	selectingSuppressFirstReload    bool                       // Track if we're selecting suppress first reload
+	selectingReloadOnStartup        bool                       // Track if we're selecting reload on startup
+	selectingUnreadOnTop            bool                       // Track if we're selecting unread on top
+	showRawHTML                     bool                       // Track if showing raw HTML in article view
+	themeSelectCursor               int                        // Cursor position in theme selector
+	highlightSelectCursor           int                        // Cursor position in highlight style selector
+	spinnerSelectCursor             int                        // Cursor position in spinner type selector
+	showReadFeedsSelectCursor       int                        // Cursor position in show read feeds selector
+	autoReloadSelectCursor          int                        // Cursor position in auto reload selector
+	suppressFirstReloadSelectCursor int                        // Cursor position in suppress first reload selector
+	reloadOnStartupSelectCursor     int                        // Cursor position in reload on startup selector
+	unreadOnTopSelectCursor         int                        // Cursor position in unread on top selector
+	settingInput                    string                     // Current input value when editing
+	showSettingsHelp                bool                       // Track if we're showing settings help
+	searchMode                      bool                       // Track if search mode is active
+	searchQuery                     string                     // Current search query text
+	searchActive                    bool                       // Track if feeds are currently filtered by search
 	unfilteredFeedList              []database.GetFeedStatsRow // Feed list before search filtering
-	statusMessage                   string         // Message to display above status bar
-	statusMessageType               string         // Type of message: "error" or "info"
-	quitPressed                     bool           // Track if 'q' was pressed once (for quit confirmation)
-	ctrlCPressed                    bool           // Track if 'ctrl+c' was pressed once (for quit confirmation)
-	addingURL                       bool           // Track if in URL adding mode
-	urlInput                        string         // Current URL input text
+	statusMessage                   string                     // Message to display above status bar
+	statusMessageType               string                     // Type of message: "error" or "info"
+	quitPressed                     bool                       // Track if 'q' was pressed once (for quit confirmation)
+	ctrlCPressed                    bool                       // Track if 'ctrl+c' was pressed once (for quit confirmation)
+	addingURL                       bool                       // Track if in URL adding mode
+	urlInput                        string                     // Current URL input text
 }
 
 type RefreshMsg struct {
@@ -283,7 +283,7 @@ type ItemReadStatusToggledMsg struct {
 }
 
 type URLAddSuccessMsg struct {
-	URL          string
+	URL           string
 	DiscoveredURL bool
 }
 
@@ -3246,7 +3246,7 @@ func (m Model) renderSettingsView() string {
 		label string
 		value string
 	}{
-		{"Reload Concurrency", fmt.Sprintf("%d (restart required)", m.config.ReloadConcurrency)},
+		{"Reload Concurrency", fmt.Sprintf("%d (restart required after changing)", m.config.ReloadConcurrency)},
 		{"Reload Time", reloadTimeStr},
 		{"Auto Reload", autoReloadStr},
 		{"Suppress First Reload", suppressFirstReloadStr},

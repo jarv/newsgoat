@@ -8,16 +8,16 @@ import (
 )
 
 type Config struct {
-	ReloadConcurrency    int
-	ReloadTime           int  // Minutes between automatic reloads (0 = disabled)
-	AutoReload           bool // Enable continuous automatic reloads
-	SuppressFirstReload  bool // Suppress the first automatic reload after startup
-	ReloadOnStartup      bool // Reload all feeds on startup
-	ThemeName            string
-	HighlightStyle       string
-	SpinnerType          string
-	ShowReadFeeds        bool
-	UnreadOnTop          bool // Show feeds with unread items at the top
+	ReloadConcurrency   int
+	ReloadTime          int  // Minutes between automatic reloads (0 = disabled)
+	AutoReload          bool // Enable continuous automatic reloads
+	SuppressFirstReload bool // Suppress the first automatic reload after startup
+	ReloadOnStartup     bool // Reload all feeds on startup
+	ThemeName           string
+	HighlightStyle      string
+	SpinnerType         string
+	ShowReadFeeds       bool
+	UnreadOnTop         bool // Show feeds with unread items at the top
 }
 
 // Setting keys
@@ -36,7 +36,7 @@ const (
 
 func GetDefaultConfig() Config {
 	return Config{
-		ReloadConcurrency:   2,
+		ReloadConcurrency:   4,
 		ReloadTime:          60,    // 60 minutes default
 		AutoReload:          false, // Disabled by default
 		SuppressFirstReload: false, // Don't suppress by default
@@ -213,3 +213,4 @@ func setSetting(queries *database.Queries, ctx context.Context, key, value strin
 		Value: value,
 	})
 }
+
