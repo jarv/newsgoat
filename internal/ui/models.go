@@ -18,6 +18,7 @@ import (
 	"github.com/jarv/newsgoat/internal/feeds"
 	"github.com/jarv/newsgoat/internal/tasks"
 	"github.com/jarv/newsgoat/internal/themes"
+	"github.com/jarv/newsgoat/internal/version"
 )
 
 const globalHelp string = "h: help"
@@ -331,6 +332,10 @@ func NewModel(feedManager *feeds.Manager, taskManager tasks.Manager, queries *da
 		firstAutoReload:      true,                // First reload should be suppressed if configured
 		pendingStartupReload: cfg.ReloadOnStartup, // Will trigger reload after feed list loads
 	}
+}
+
+func (m *Model) SetURLsFilePath(path string) {
+	m.urlsFilePath = path
 }
 
 func (m Model) Init() tea.Cmd {
@@ -1431,7 +1436,7 @@ func (m Model) getUnreadStyle() lipgloss.Style {
 
 func (m Model) renderFeedList() string {
 	var b strings.Builder
-	b.WriteString(m.getTitleStyle().Render("🐐 NewsGoat - RSS Reader"))
+	b.WriteString(m.getTitleStyle().Render("🐐 NewsGoat " + version.GetVersion() + " - RSS Reader"))
 
 	if m.refreshing {
 		b.WriteString(" - ")
@@ -1482,8 +1487,21 @@ func (m Model) renderFeedList() string {
 		// Only show "add URLs" message if there are actually no feeds in the database
 		// Don't show it if feeds are just filtered out (e.g., ShowReadFeeds = no)
 		if m.totalFeedCount == 0 {
-			content = "No feeds found. Add URLs to ~/.config/newsgoat/urls"
-			contentLines = 1
+			var urlPath string
+			if m.urlsFilePath != "" {
+				urlPath = m.urlsFilePath
+			} else {
+				urlPath = "~/.config/newsgoat/urls"
+			}
+			content = "Add RSS feeds to " + urlPath + " by\n" +
+				"editing the file by pressing 'U' or press 'u' to add\n" +
+				"a single feed URL.\n" +
+				"\n" +
+				"Hints:\n" +
+				"- Press 'R' to reload all feeds\n" +
+				"- Press 'c' to view the config\n" +
+				"- See keyboard shortcuts with 'h'"
+			contentLines = 8
 		} else if m.searchMode && m.searchQuery != "" {
 			content = "No feeds match search"
 			contentLines = 1

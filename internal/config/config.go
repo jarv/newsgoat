@@ -38,9 +38,9 @@ func GetDefaultConfig() Config {
 	return Config{
 		ReloadConcurrency:   4,
 		ReloadTime:          60,    // 60 minutes default
-		AutoReload:          false, // Disabled by default
+		AutoReload:          true,  // Disabled by default
 		SuppressFirstReload: false, // Don't suppress by default
-		ReloadOnStartup:     false, // Don't reload on startup by default
+		ReloadOnStartup:     true,  // Don't reload on startup by default
 		ThemeName:           "dark",
 		HighlightStyle:      "prefix-underline",
 		SpinnerType:         "braille",
@@ -213,4 +213,3 @@ func setSetting(queries *database.Queries, ctx context.Context, key, value strin
 		Value: value,
 	})
 }
-

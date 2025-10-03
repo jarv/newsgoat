@@ -19,12 +19,25 @@ func InitDBWithSchema(schemaSQL string) (*sql.DB, *Queries, error) {
 		return nil, nil, err
 	}
 
-	dbDir := filepath.Join(homeDir, ".newsgoat")
-	if err := os.MkdirAll(dbDir, 0755); err != nil {
-		return nil, nil, err
-	}
+	// Try new location first: ~/.config/newsgoat/
+	newDir := filepath.Join(homeDir, ".config", "newsgoat")
+	newPath := filepath.Join(newDir, "newsgoat.db")
 
-	dbPath := filepath.Join(dbDir, "newsgoat.db")
+	// Check if database exists in old location
+	oldDir := filepath.Join(homeDir, ".newsgoat")
+	oldPath := filepath.Join(oldDir, "newsgoat.db")
+
+	var dbPath string
+	if _, err := os.Stat(oldPath); err == nil {
+		// Use old location if it exists
+		dbPath = oldPath
+	} else {
+		// Use new location (create directory if needed)
+		if err := os.MkdirAll(newDir, 0755); err != nil {
+			return nil, nil, err
+		}
+		dbPath = newPath
+	}
 
 	// Add SQLite connection parameters for better concurrency
 	// dsn := dbPath + "?_busy_timeout=60000&_journal_mode=WAL&_synchronous=NORMAL&_cache_size=2000&_locking_mode=NORMAL&_foreign_keys=ON"

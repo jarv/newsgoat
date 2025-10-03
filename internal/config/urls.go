@@ -143,16 +143,6 @@ func CreateSampleURLsFile() error {
 		return err
 	}
 
-	sampleURLs := []string{
-		"# NewsGoat RSS Feeds",
-		"# Add your RSS feed URLs below, one per line",
-		"# Lines starting with # are comments",
-		"",
-		"https://feeds.feedburner.com/techcrunch",
-		"https://rss.cnn.com/rss/edition.rss",
-		"https://feeds.bbci.co.uk/news/rss.xml",
-	}
-
 	file, err := os.Create(urlsPath)
 	if err != nil {
 		return err
@@ -162,10 +152,8 @@ func CreateSampleURLsFile() error {
 	}()
 
 	writer := bufio.NewWriter(file)
-	for _, line := range sampleURLs {
-		if _, err := writer.WriteString(line + "\n"); err != nil {
-			return err
-		}
+	if _, err := writer.WriteString("# Add your RSS feeds to this file\n"); err != nil {
+		return err
 	}
 
 	return writer.Flush()

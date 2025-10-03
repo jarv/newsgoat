@@ -48,7 +48,7 @@ func main() {
 	flag.Parse()
 
 	if *showVersion {
-		fmt.Println(version.GetUserAgent())
+		fmt.Println(version.GetVersion())
 		return
 	}
 
@@ -154,6 +154,13 @@ func run(urlFile string) error {
 		logger.Warn("Failed to create sample URLs file", "error", err)
 	}
 
+	// Get URLs file path
+	urlsPath, err := config.GetURLsFilePath()
+	if err != nil {
+		logger.Warn("Failed to get URLs file path", "error", err)
+		urlsPath = ""
+	}
+
 	var urls []string
 	if urlFile != "" {
 		var readErr error
@@ -161,6 +168,7 @@ func run(urlFile string) error {
 		if readErr != nil {
 			return fmt.Errorf("failed to read URLs file: %w", readErr)
 		}
+		urlsPath = urlFile
 	} else {
 		var readErr error
 		urls, readErr = config.ReadURLsFile()
@@ -174,6 +182,7 @@ func run(urlFile string) error {
 	}
 
 	model := ui.NewModel(feedManager, taskManager, queries, cfg)
+	model.SetURLsFilePath(urlsPath)
 	p := tea.NewProgram(model, tea.WithAltScreen())
 
 	if _, err := p.Run(); err != nil {
