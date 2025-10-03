@@ -1,3 +1,10 @@
+# [1.6.0](https://github.com/jarv/newsgoat/compare/v1.5.0...v1.6.0) (2025-10-03)
+
+
+### Features
+
+* Adds debug flag for debug log messages ([35f20a4](https://github.com/jarv/newsgoat/commit/35f20a4266c777de019b9095465330b853de3755))
+
 # [1.5.0](https://github.com/jarv/newsgoat/compare/v1.4.0...v1.5.0) (2025-10-03)
 
 
