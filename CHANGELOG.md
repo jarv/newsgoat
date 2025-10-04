@@ -1,3 +1,10 @@
+## [1.6.1](https://github.com/jarv/newsgoat/compare/v1.6.0...v1.6.1) (2025-10-04)
+
+
+### Bug Fixes
+
+* Clear feed error when getting a 304 not-modified ([e73e4da](https://github.com/jarv/newsgoat/commit/e73e4da030eeed8094099e327df21edff7b6cbb8))
+
 # [1.6.0](https://github.com/jarv/newsgoat/compare/v1.5.0...v1.6.0) (2025-10-03)
 
 
