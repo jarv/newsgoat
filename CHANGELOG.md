@@ -1,3 +1,10 @@
+## [1.6.2](https://github.com/jarv/newsgoat/compare/v1.6.1...v1.6.2) (2025-10-04)
+
+
+### Bug Fixes
+
+* Improves link references in the article view ([21975e7](https://github.com/jarv/newsgoat/commit/21975e7926650defaf61c50ea82a8a266bcd743d))
+
 ## [1.6.1](https://github.com/jarv/newsgoat/compare/v1.6.0...v1.6.1) (2025-10-04)
 
 
