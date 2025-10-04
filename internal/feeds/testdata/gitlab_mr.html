@@ -1,0 +1,75 @@
+<h2 dir="auto">
+<a href="#what-does-this-mr-do" aria-hidden="true" class="anchor" id="user-content-what-does-this-mr-do"></a>What does this MR do?</h2>
+
+<p dir="auto">Update unzip to 6.0.29</p>
+<p dir="auto">Part of the effort to build omnibus installer on Debian 13 which ships with gcc 14.</p>
+<p dir="auto">The new compiler brings some problems to the front. Previous to this MR we build the &#34;generic&#34; target which relies on the &#34;configure&#34; script shipped with infozip to detect platform capabilities.</p>
+<p dir="auto">In my opinion this configure script is outdated. It compiles some programs to detect capabilities and the success of compilation means that the capability is there. However most of the programs are (according to modern compilers) malformed and until now reported warnings but accepted compilation. With gcc 14 (and I believe since 13) , these warnings are now treated as errors and the behaviour of the configure script (and the whole build) completely changes. Furthermore the configure script accepts command line parameters to be passed in for some tests but not for others so the way to fix what we currently have means patching the configure script.</p>
+<p dir="auto">Instead of doing the above I&#39;m changing to building the unzip package like debian (13) does*:</p>
+<ul dir="auto">
+<li><a href="https://sources.debian.org/src/unzip/6.0-29/debian/rules" rel="nofollow noreferrer noopener" target="_blank">rules</a></li>
+<li><a href="https://sources.debian.org/patches/unzip/6.0-29/" rel="nofollow noreferrer noopener" target="_blank">patches</a></li>
+</ul>
+<p dir="auto">* An exception to this is that I do not link against bzip2 since we don&#39;t do that for our other platforms (we have a bzip2 depedency in omnibus, but not for unzip so I propose we keep things as they are).</p>
+<p dir="auto">Here&#39;s an example of the kind of problems configure has (since I cannot link to any sources in this MR):</p>
+<div class="gl-relative markdown-code-block js-markdown-code">
+<pre class="code highlight js-syntax-highlight language-plaintext" v-pre="true"><code><span id="LC1" class="line" lang="plaintext" xml:lang="plaintext">echo Check for directory libraries</span>
+<span id="LC2" class="line" lang="plaintext" xml:lang="plaintext">cat &gt; conftest.c &lt;&lt; _EOF_</span>
+<span id="LC3" class="line" lang="plaintext" xml:lang="plaintext">int main() { return closedir(opendir(&#34;.&#34;)); }</span>
+<span id="LC4" class="line" lang="plaintext" xml:lang="plaintext">_EOF_</span>
+<span id="LC5" class="line" lang="plaintext" xml:lang="plaintext"></span>
+<span id="LC6" class="line" lang="plaintext" xml:lang="plaintext">$CC -o conftest conftest.c &gt;/dev/null 2&gt;/dev/null</span>
+<span id="LC7" class="line" lang="plaintext" xml:lang="plaintext">...</span>
+<span id="LC8" class="line" lang="plaintext" xml:lang="plaintext">...</span>
+<span id="LC9" class="line" lang="plaintext" xml:lang="plaintext">CFLAGSR=&#34;${CFLAGSR} -DNO_DIR&#34;</span></code></pre>
+<copy-code></copy-code><insert-code-snippet></insert-code-snippet>
+</div>
+<p dir="auto">A program that should not compile (closedir and opendir are implicitely declared, which is an error) turns NO_DIR on for modern compilers. That in turn leads to further errors during compilation (which multiple other tests contribute to).</p>
+<h2 dir="auto">
+<a href="#related-issues" aria-hidden="true" class="anchor" id="user-content-related-issues"></a>Related issues</h2>
+<p dir="auto">Related issue is <a href="https://gitlab.com/gitlab-org/omnibus-gitlab/-/issues/9225" data-reference-type="issue" data-original="here" data-link="true" data-link-reference="true" data-issue="171475601" data-project="20699" data-iid="9225" data-namespace-path="gitlab-org/omnibus-gitlab" data-project-path="gitlab-org/omnibus-gitlab" data-issue-type="issue" data-container="body" data-placement="top" title="Provide packages for Debian 13 (Trixie)" class="gfm gfm-issue">here</a></p>
+<h2 dir="auto">
+<a href="#checklist" aria-hidden="true" class="anchor" id="user-content-checklist"></a>Checklist</h2>
+<p dir="auto">See <a href="https://gitlab.com/gitlab-org/omnibus-gitlab/blob/master/CONTRIBUTING.md#definition-of-done">Definition of done</a>.</p>
+<p dir="auto">For anything in this list which will not be completed, please provide a reason in the MR discussion.</p>
+<h3 dir="auto">
+<a href="#required" aria-hidden="true" class="anchor" id="user-content-required"></a>Required</h3>
+<ul class="task-list" dir="auto">
+<li class="task-list-item">
+<task-button></task-button><input type="checkbox" class="task-list-item-checkbox" aria-label="Check option: MR title and description are up to date, accurate, and descriptive." disabled="disabled"/> MR title and description are up to date, accurate, and descriptive.</li>
+<li class="task-list-item">
+<task-button></task-button><input type="checkbox" class="task-list-item-checkbox" aria-label="Check option: MR targeting the appropriate branch." disabled="disabled"/> MR targeting the appropriate branch.</li>
+<li class="task-list-item">
+<task-button></task-button><input type="checkbox" class="task-list-item-checkbox" aria-label="Check option: Latest Merge Result pipeline is green." disabled="disabled"/> Latest Merge Result pipeline is green.</li>
+<li class="task-list-item">
+<task-button></task-button><input type="checkbox" class="task-list-item-checkbox" aria-label="Check option: When ready for review, MR is labeled workflowready for review per the Distribution MR workflow." disabled="disabled"/> When ready for review, MR is labeled <span class="gl-label gl-label-scoped" style="--label-inset-border: inset 0 0 0 2px #428BCA; color: #428BCA"><a href="https://gitlab.com/gitlab-org/omnibus-gitlab/-/issues?label_name=workflow%3A%3Aready+for+review" data-reference-type="label" data-original="~&#34;workflow::ready for review&#34;" data-link="false" data-link-reference="false" data-label="7442317" data-project="20699" data-html="true" data-container="body" data-placement="top" title="&lt;span class=&#39;gl-font-bold&#39;&gt;Scoped label&lt;/span&gt;&lt;br&gt;Merge requests which are ready to be reviewed and can be reviewed by any team-member with sufficient knowledge in the given area. For reviewing the merge request just assign to yourself and remove this label." class="gfm gfm-label has-tooltip gl-link gl-label-link"><span class="gl-label-text gl-label-text-light" data-container="body" data-html="true" style="background-color: #428BCA">workflow</span><span class="gl-label-text-scoped" data-container="body" data-html="true">ready for review</span></a></span> per the <a href="https://about.gitlab.com/handbook/engineering/development/enablement/systems/distribution/merge_requests.html" rel="nofollow noreferrer noopener" target="_blank">Distribution MR workflow</a>.</li>
+</ul>
+<h4 dir="auto">
+<a href="#for-gitlab-team-members" aria-hidden="true" class="anchor" id="user-content-for-gitlab-team-members"></a>For GitLab team members</h4>
+<p dir="auto">If you don&#39;t have access to this, the reviewer should trigger these jobs for you during the review process.</p>
+<ul class="task-list" dir="auto">
+<li class="task-list-item">
+<task-button></task-button><input type="checkbox" class="task-list-item-checkbox" aria-label="Check option: The manual Trigger:ee-package jobs have a green pipeline running against latest commit." disabled="disabled"/> The manual <code>Trigger:ee-package</code> jobs have a green pipeline running against latest commit.</li>
+<li class="task-list-item">
+<task-button></task-button><input type="checkbox" class="task-list-item-checkbox" aria-label="Check option: If config/software or config/patches directories are changed, make sure the build-package-on-all-os…" disabled="disabled"/> If <code>config/software</code> or <code>config/patches</code> directories are changed, make sure the <code>build-package-on-all-os</code> job within the <code>Trigger:ee-package</code> downstream pipeline succeeded.</li>
+<li class="task-list-item">
+<task-button></task-button><input type="checkbox" class="task-list-item-checkbox" aria-label="Check option: If you are changing anything SSL related, then the Trigger:package:fips manual job within the…" disabled="disabled"/> If you are changing anything SSL related, then the <code>Trigger:package:fips</code> manual job within the <code>Trigger:ee-package</code> downstream pipeline must succeed.</li>
+<li class="task-list-item">
+<task-button></task-button><input type="checkbox" class="task-list-item-checkbox" aria-label="Check option: If CI configuration is changed, the branch must be pushed to dev.gitlab.org to confirm regular…" disabled="disabled"/> If CI configuration is changed, the branch must be pushed to <a href="https://dev.gitlab.org/gitlab/omnibus-gitlab" rel="nofollow noreferrer noopener" target="_blank"><code>dev.gitlab.org</code></a> to confirm regular branch builds aren&#39;t broken.</li>
+</ul>
+<h3 dir="auto">
+<a href="#expected-please-provide-an-explanation-if-not-completing" aria-hidden="true" class="anchor" id="user-content-expected-please-provide-an-explanation-if-not-completing"></a>Expected (please provide an explanation if not completing)</h3>
+<ul class="task-list" dir="auto">
+<li class="task-list-item">
+<task-button></task-button><input type="checkbox" class="task-list-item-checkbox" aria-label="Check option: Test plan indicating conditions for success has been posted and passes." disabled="disabled"/> Test plan indicating conditions for success has been posted and passes.</li>
+<li class="task-list-item">
+<task-button></task-button><input type="checkbox" class="task-list-item-checkbox" aria-label="Check option: Documentation created/updated." disabled="disabled"/> Documentation created/updated.</li>
+<li class="task-list-item">
+<task-button></task-button><input type="checkbox" class="task-list-item-checkbox" aria-label="Check option: Tests added." disabled="disabled"/> Tests added.</li>
+<li class="task-list-item">
+<task-button></task-button><input type="checkbox" class="task-list-item-checkbox" aria-label="Check option: Integration tests added to GitLab QA." disabled="disabled"/> Integration tests added to <a href="https://gitlab.com/gitlab-org/gitlab-qa">GitLab QA</a>.</li>
+<li class="task-list-item">
+<task-button></task-button><input type="checkbox" class="task-list-item-checkbox" aria-label="Check option: Equivalent MR/issue for the GitLab Chart opened." disabled="disabled"/> Equivalent MR/issue for the <a href="https://gitlab.com/gitlab-org/charts/gitlab">GitLab Chart</a> opened.</li>
+<li class="task-list-item">
+<task-button></task-button><input type="checkbox" class="task-list-item-checkbox" aria-label="Check option: Validate potential values for new configuration settings. Formats such as integer 10, duration 10s,…" disabled="disabled"/> Validate potential values for new configuration settings. Formats such as integer <code>10</code>, duration <code>10s</code>, URI <code>scheme://user:passwd@host:port</code> may require quotation or other special handling when rendered in a template and written to a configuration file.</li>
+</ul>

@@ -445,22 +445,9 @@ func (m *Manager) ExtractLinks(content string) []string {
 	var links []string
 	seen := make(map[string]bool)
 
-	// Extract from markdown [text](url) syntax
-	mdLinkPattern := regexp.MustCompile(`\[([^\]]+)\]\(([^)]+)\)`)
-	matches := mdLinkPattern.FindAllStringSubmatch(content, -1)
-	for _, match := range matches {
-		if len(match) > 2 {
-			link := match[2]
-			if (strings.HasPrefix(link, "http://") || strings.HasPrefix(link, "https://")) && !seen[link] {
-				links = append(links, link)
-				seen[link] = true
-			}
-		}
-	}
-
-	// Extract from HTML <a href="..."> tags (for content that wasn't converted)
-	hrefPattern := regexp.MustCompile(`<a[^>]+href=["']([^"']+)["']`)
-	matches = hrefPattern.FindAllStringSubmatch(content, -1)
+	// Extract from HTML <a href="..."> tags
+	hrefPattern := regexp.MustCompile(`<a[^>]+href=["']([^"']+)["'][^>]*>`)
+	matches := hrefPattern.FindAllStringSubmatch(content, -1)
 	for _, match := range matches {
 		if len(match) > 1 {
 			link := match[1]
@@ -471,9 +458,14 @@ func (m *Manager) ExtractLinks(content string) []string {
 		}
 	}
 
-	// Also extract plain URLs from text
+	// Also extract plain URLs from text (not in HTML tags)
+	// This handles cases where URLs appear in plain text
 	if strings.Contains(content, "http") {
-		words := strings.Fields(content)
+		// Remove all HTML tags first to avoid extracting URLs from tag attributes
+		htmlTagPattern := regexp.MustCompile(`<[^>]*>`)
+		plainText := htmlTagPattern.ReplaceAllString(content, " ")
+
+		words := strings.Fields(plainText)
 		for _, word := range words {
 			if strings.HasPrefix(word, "http://") || strings.HasPrefix(word, "https://") {
 				link := strings.TrimRight(word, ".,!?;)")
@@ -486,6 +478,79 @@ func (m *Manager) ExtractLinks(content string) []string {
 	}
 
 	return links
+}
+
+// AddLinkMarkersToHTML adds numbered markers [1], [2], etc. to HTML anchor tags
+// Returns the modified HTML and the list of links in order
+func (m *Manager) AddLinkMarkersToHTML(content string) (string, []string) {
+	links := m.ExtractLinks(content)
+	if len(links) == 0 {
+		return content, links
+	}
+
+	// Build a map of link URL to its number
+	linkNumbers := make(map[string]int)
+	for i, link := range links {
+		linkNumbers[link] = i + 1
+	}
+
+	// Replace anchor tags to add markers
+	// We need to match opening <a> tags and find their corresponding closing </a> tags
+	// This regex matches the opening <a> tag with href attribute
+	openTagPattern := regexp.MustCompile(`<a\s+([^>]*href=["']([^"']+)["'][^>]*)>`)
+
+	result := content
+	offset := 0
+
+	// Find all opening <a> tags
+	matches := openTagPattern.FindAllStringSubmatchIndex(content, -1)
+
+	for _, match := range matches {
+		// match[0], match[1] = full match start and end
+		// match[4], match[5] = URL (second capturing group)
+		if len(match) < 6 {
+			continue
+		}
+
+		// Extract the URL from the original content
+		url := content[match[4]:match[5]]
+
+		// Find the link number
+		linkNum, exists := linkNumbers[url]
+		if !exists {
+			continue
+		}
+
+		// Find the corresponding closing </a> tag
+		// Start searching after the opening tag
+		searchStart := match[1]
+		depth := 1
+		closeTagStart := -1
+
+		for i := searchStart; i < len(content)-3; i++ {
+			if content[i:i+2] == "<a" && (i+2 >= len(content) || content[i+2] == ' ' || content[i+2] == '>') {
+				depth++
+			} else if content[i:i+4] == "</a>" {
+				depth--
+				if depth == 0 {
+					closeTagStart = i
+					break
+				}
+			}
+		}
+
+		if closeTagStart == -1 {
+			continue
+		}
+
+		// Insert the marker before the closing tag
+		marker := fmt.Sprintf(" [%d]", linkNum)
+		insertPos := closeTagStart + offset
+		result = result[:insertPos] + marker + result[insertPos:]
+		offset += len(marker)
+	}
+
+	return result, links
 }
 
 func (m *Manager) GetLogMessages(limit int64) ([]LogMessage, error) {

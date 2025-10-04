@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -1159,7 +1158,11 @@ func (m Model) handleItemListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "enter":
 		if len(m.itemList) > 0 && m.cursor < len(m.itemList) {
 			m.currentItem = m.itemList[m.cursor]
-			m.links = m.feedManager.ExtractLinks(m.currentItem.Content)
+			content := m.currentItem.Content
+			if content == "" {
+				content = m.currentItem.Description
+			}
+			m.links = m.feedManager.ExtractLinks(content)
 			m.state = ArticleView
 
 			if !m.currentItem.Read {
@@ -1298,7 +1301,11 @@ func (m Model) handleArticleKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.savedItemCursor = nextCursor
 				m.cursor = nextCursor
 				m.currentItem = m.itemList[nextCursor]
-				m.links = m.feedManager.ExtractLinks(m.currentItem.Content)
+				content := m.currentItem.Content
+				if content == "" {
+					content = m.currentItem.Description
+				}
+				m.links = m.feedManager.ExtractLinks(content)
 				m.showRawHTML = false   // Reset raw HTML view when navigating
 				m.articleViewScroll = 0 // Reset scroll position when navigating
 
@@ -1319,7 +1326,11 @@ func (m Model) handleArticleKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.savedItemCursor = prevCursor
 				m.cursor = prevCursor
 				m.currentItem = m.itemList[prevCursor]
-				m.links = m.feedManager.ExtractLinks(m.currentItem.Content)
+				content := m.currentItem.Content
+				if content == "" {
+					content = m.currentItem.Description
+				}
+				m.links = m.feedManager.ExtractLinks(content)
 				m.showRawHTML = false   // Reset raw HTML view when navigating
 				m.articleViewScroll = 0 // Reset scroll position when navigating
 
@@ -1844,26 +1855,12 @@ func (m *Model) getArticleContentLines() []string {
 		return wrappedLines
 	}
 
-	// Convert HTML to markdown first
+	// Add link markers to HTML BEFORE converting to markdown
+	// This ensures the markers are properly preserved during conversion
+	content, _ = m.feedManager.AddLinkMarkersToHTML(content)
+
+	// Convert HTML to markdown
 	content = m.feedManager.ConvertHTMLToMarkdown(content)
-
-	// Before rendering with glamour, replace markdown/HTML links with numbered markers
-	linkCounter := 1
-	for _, link := range m.links {
-		linkNum := fmt.Sprintf(" [%d]", linkCounter)
-
-		// Try markdown syntax first: [text](url) -> text [N]
-		mdPattern := fmt.Sprintf(`\[([^\]]+)\]\(%s\)`, regexp.QuoteMeta(link))
-		re := regexp.MustCompile(mdPattern)
-		content = re.ReplaceAllString(content, "$1"+linkNum)
-
-		// Also try HTML anchor tags: <a href="link">text</a> -> text [N]
-		hrefPattern := fmt.Sprintf(`<a[^>]*href=["']%s["'][^>]*>([^<]*)</a>`, regexp.QuoteMeta(link))
-		re = regexp.MustCompile(hrefPattern)
-		content = re.ReplaceAllString(content, "$1"+linkNum)
-
-		linkCounter++
-	}
 
 	// Render markdown content using glamour
 	if m.glamourRenderer != nil {
