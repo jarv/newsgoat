@@ -272,6 +272,8 @@ func (m *Manager) RefreshFeed(feedID int64) error {
 	// Handle 304 Not Modified - feed hasn't changed
 	if resp.StatusCode == http.StatusNotModified {
 		logging.Debug("Feed not modified", "url", feed.Url, "status", resp.StatusCode)
+		// Clear any previous error since we successfully connected
+		m.recordFeedError(feedID, nil)
 		// Update last_updated to track that we checked
 		now := sql.NullTime{Time: time.Now(), Valid: true}
 		m.dbMutex.Lock()
