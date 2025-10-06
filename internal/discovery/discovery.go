@@ -10,16 +10,60 @@ import (
 	"golang.org/x/net/html"
 )
 
+// URLType represents the type of URL detected
+type URLType string
+
+const (
+	URLTypeYouTube URLType = "youtube"
+	URLTypeGitHub  URLType = "github"
+	URLTypeGitLab  URLType = "gitlab"
+	URLTypeGeneric URLType = "generic"
+)
+
 // DiscoverFeed attempts to discover an RSS/Atom feed URL from a given URL.
 // If the URL is already a feed, it returns it as-is.
 // If it's a YouTube URL, it extracts the channel ID and returns the YouTube RSS feed.
+// If it's a GitHub URL, it converts it to the appropriate Atom feed URL.
+// If it's a GitLab URL, it converts it to the appropriate Atom feed URL.
 // If it's an HTML page, it searches for feed links in the HTML.
 func DiscoverFeed(url string) (string, error) {
-	// Check if it's a YouTube URL first
-	if isYouTubeURL(url) {
-		return discoverYouTubeFeed(url)
+	// If URL already looks like a feed (ends with .atom, .xml, .rss), treat it as generic
+	if isLikelyFeedURL(url) {
+		// Skip GitHub/GitLab pattern matching and go straight to content type check
+		return checkGenericFeed(url)
 	}
 
+	// Check URL type and handle accordingly
+	urlType := GetURLType(url)
+
+	switch urlType {
+	case URLTypeYouTube:
+		return discoverYouTubeFeed(url)
+	case URLTypeGitHub:
+		return discoverGitHubFeed(url)
+	case URLTypeGitLab:
+		return discoverGitLabFeed(url)
+	}
+
+	// For generic URLs, fetch and check content type
+	return checkGenericFeed(url)
+}
+
+// isLikelyFeedURL checks if a URL ends with common feed extensions
+func isLikelyFeedURL(url string) bool {
+	// Strip query string for checking
+	baseURL := url
+	if idx := strings.Index(url, "?"); idx != -1 {
+		baseURL = url[:idx]
+	}
+	return strings.HasSuffix(baseURL, ".atom") ||
+		strings.HasSuffix(baseURL, ".xml") ||
+		strings.HasSuffix(baseURL, ".rss")
+}
+
+// checkGenericFeed fetches a URL and checks if it's a feed based on content type
+func checkGenericFeed(url string) (string, error) {
+	// For generic URLs, fetch and check content type
 	resp, err := http.Get(url)
 	if err != nil {
 		return "", fmt.Errorf("failed to fetch URL: %w", err)
@@ -143,9 +187,97 @@ func resolveURL(baseURL, relativeURL string) string {
 	return baseURL[:lastSlash+1] + relativeURL
 }
 
+// GetURLType determines the type of URL
+func GetURLType(url string) URLType {
+	if isYouTubeURL(url) {
+		return URLTypeYouTube
+	}
+	if isGitHubURL(url) {
+		return URLTypeGitHub
+	}
+	if isGitLabURL(url) {
+		return URLTypeGitLab
+	}
+	return URLTypeGeneric
+}
+
 // isYouTubeURL checks if a URL is a YouTube URL
 func isYouTubeURL(url string) bool {
 	return strings.Contains(url, "youtube.com") || strings.Contains(url, "youtu.be")
+}
+
+// isGitHubURL checks if a URL is a GitHub URL
+func isGitHubURL(url string) bool {
+	return strings.HasPrefix(url, "https://github.com/")
+}
+
+// isGitLabURL checks if a URL is a GitLab URL
+func isGitLabURL(url string) bool {
+	return strings.HasPrefix(url, "https://gitlab.com/")
+}
+
+// discoverGitHubFeed converts a GitHub URL to its Atom feed URL
+// Handles URLs like:
+// - https://github.com/<repo>/tree/<branch>/path -> https://github.com/<repo>/commits/<branch>/path.atom
+// - https://github.com/<repo>/blob/<branch>/path -> https://github.com/<repo>/commits/<branch>/path.atom
+// - https://github.com/<repo>/commits/<branch>/path -> https://github.com/<repo>/commits/<branch>/path.atom
+func discoverGitHubFeed(url string) (string, error) {
+	// Strip query string if present
+	if idx := strings.Index(url, "?"); idx != -1 {
+		url = url[:idx]
+	}
+
+	// Pattern: https://github.com/<repo path>/{tree|blob|commits}/<branch>/path/to/location
+	pattern := regexp.MustCompile(`^(https://github\.com/[^/]+/[^/]+)/(tree|blob|commits)/(.+)$`)
+	matches := pattern.FindStringSubmatch(url)
+
+	if len(matches) != 4 {
+		return "", fmt.Errorf("URL does not match GitHub tree/blob/commits pattern")
+	}
+
+	repoBase := matches[1]      // https://github.com/owner/repo
+	pathType := matches[2]      // tree, blob, or commits
+	branchAndPath := matches[3] // branch/path/to/location
+
+	// Replace tree or blob with commits (if it's already commits, this is a no-op)
+	_ = pathType // We don't actually need this since we always use "commits"
+
+	// Construct the Atom feed URL
+	feedURL := fmt.Sprintf("%s/commits/%s.atom", repoBase, branchAndPath)
+
+	return feedURL, nil
+}
+
+// discoverGitLabFeed converts a GitLab URL to its Atom feed URL
+// Handles URLs like:
+// - https://gitlab.com/<project>/-/tree/<branch>/path -> https://gitlab.com/<project>/-/commits/<branch>/path?format=atom
+// - https://gitlab.com/<project>/-/blob/<branch>/path -> https://gitlab.com/<project>/-/commits/<branch>/path?format=atom
+// - https://gitlab.com/<project>/-/commits/<branch>/path -> https://gitlab.com/<project>/-/commits/<branch>/path?format=atom
+func discoverGitLabFeed(url string) (string, error) {
+	// Strip query string if present
+	if idx := strings.Index(url, "?"); idx != -1 {
+		url = url[:idx]
+	}
+
+	// Pattern: https://gitlab.com/<project path>/-/{tree|blob|commits}/<branch>/path/to/location
+	pattern := regexp.MustCompile(`^(https://gitlab\.com/[^/]+(?:/[^/]+)*)/-/(tree|blob|commits)/(.+)$`)
+	matches := pattern.FindStringSubmatch(url)
+
+	if len(matches) != 4 {
+		return "", fmt.Errorf("URL does not match GitLab tree/blob/commits pattern")
+	}
+
+	projectBase := matches[1]   // https://gitlab.com/group/project or https://gitlab.com/group/subgroup/project
+	pathType := matches[2]      // tree, blob, or commits
+	branchAndPath := matches[3] // branch/path/to/location
+
+	// Replace tree or blob with commits (if it's already commits, this is a no-op)
+	_ = pathType // We don't actually need this since we always use "commits"
+
+	// Construct the Atom feed URL with ?format=atom
+	feedURL := fmt.Sprintf("%s/-/commits/%s?format=atom", projectBase, branchAndPath)
+
+	return feedURL, nil
 }
 
 // discoverYouTubeFeed extracts the channel ID from a YouTube URL and returns the RSS feed URL

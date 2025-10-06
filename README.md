@@ -25,6 +25,20 @@ Meanwhile, “vibe coding” was catching on, and it seemed like a fun excuse to
 - Option to put feeds with unread items at the top. Press <kbd>c</kbd> to configure.
 - Automatic feed discovery when adding URLs. Press <kbd>u</kbd> to add a youtube link and automatically subscribe to the channel's feed.
 
+## Feed Auto Discovery
+
+### Watch individual files or directories in a GitHub/GitLab repository
+
+It is possible to monitor individual files (or directories) in GitHub/GitLab by subscribing to that files commit history.
+There is first-class support for this by parsing any GitHub/GitLab link when you press <kbd>u</kbd> to add a URL and will subscribe to the feed.
+The name of the feed will be displayed as the path to the file.
+If `GITHUB_FEED_TOKEN` or `GITLAB_FEED_TOKEN` is set in the environment, it will use that as part of fetch for private repositories.
+
+### Youtube
+
+Subscribe to a YouTube channel with RSS by pressing <kbd>u</kbd> to add a YouTube URL.
+This will extract the `channel_id` and subscribe to the channel RSS feed.
+
 ## Design Principles
 
 - **Beautiful and compact**: Compact design and tactful use of emojis.

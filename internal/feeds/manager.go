@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"fmt"
 	"net/http"
+	"net/url"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -13,6 +15,7 @@ import (
 
 	md "github.com/JohannesKaufmann/html-to-markdown/v2"
 	"github.com/jarv/newsgoat/internal/database"
+	"github.com/jarv/newsgoat/internal/discovery"
 	"github.com/jarv/newsgoat/internal/logging"
 	"github.com/jarv/newsgoat/internal/version"
 	"github.com/mmcdole/gofeed"
@@ -118,6 +121,38 @@ func (m *Manager) ConvertHTMLToMarkdown(input string) string {
 	}
 
 	return strings.Join(cleanLines, "\n")
+}
+
+// addFeedTokenIfNeeded adds feed_token query parameter for GitHub/GitLab feeds if env vars are set
+func (m *Manager) addFeedTokenIfNeeded(feedURL string) string {
+	urlType := discovery.GetURLType(feedURL)
+
+	var token string
+	switch urlType {
+	case discovery.URLTypeGitHub:
+		token = os.Getenv("GITHUB_FEED_TOKEN")
+	case discovery.URLTypeGitLab:
+		token = os.Getenv("GITLAB_FEED_TOKEN")
+	default:
+		return feedURL
+	}
+
+	if token == "" {
+		return feedURL
+	}
+
+	// Parse the URL and add feed_token query parameter
+	parsedURL, err := url.Parse(feedURL)
+	if err != nil {
+		logging.Warn("Failed to parse feed URL for token addition", "url", feedURL, "error", err)
+		return feedURL
+	}
+
+	q := parsedURL.Query()
+	q.Set("feed_token", token)
+	parsedURL.RawQuery = q.Encode()
+
+	return parsedURL.String()
 }
 
 func NewManager(db *sql.DB, queries *database.Queries) *Manager {
@@ -251,8 +286,11 @@ func (m *Manager) RefreshFeed(feedID int64) error {
 	// Create HTTP client with conditional request support
 	client := m.createHTTPClientForFeed(feed.Url)
 
+	// Build the request URL with feed token if needed
+	requestURL := m.addFeedTokenIfNeeded(feed.Url)
+
 	// Make the HTTP request
-	req, err := http.NewRequestWithContext(ctx, "GET", feed.Url, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", requestURL, nil)
 	if err != nil {
 		logging.Error("Error creating request", "url", feed.Url, "error", err)
 		m.recordFeedError(feedID, err)

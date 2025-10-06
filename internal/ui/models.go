@@ -14,6 +14,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/jarv/newsgoat/internal/config"
 	"github.com/jarv/newsgoat/internal/database"
+	"github.com/jarv/newsgoat/internal/discovery"
 	"github.com/jarv/newsgoat/internal/feeds"
 	"github.com/jarv/newsgoat/internal/tasks"
 	"github.com/jarv/newsgoat/internal/themes"
@@ -95,6 +96,21 @@ func wrapText(text string, width int) []string {
 	return lines
 }
 
+// getDisplayTitle returns the display title for a feed, overriding for GitHub/GitLab
+func getDisplayTitle(feed database.GetFeedStatsRow) string {
+	switch discovery.GetURLType(feed.Url) {
+	case discovery.URLTypeGitHub, discovery.URLTypeGitLab:
+		if strings.Contains(feed.Url, "commits") {
+			// Remove https:// and .atom from the URL for display
+			displayTitle := strings.TrimPrefix(feed.Url, "https://")
+			return strings.TrimSuffix(displayTitle, ".atom")
+		}
+		return feed.Title
+	default:
+		return feed.Title
+	}
+}
+
 // filterFeedsBySearch filters the feed list based on the search query
 func (m *Model) filterFeedsBySearch() {
 	if m.searchQuery == "" {
@@ -103,11 +119,12 @@ func (m *Model) filterFeedsBySearch() {
 		return
 	}
 
-	// Filter feeds by title (case-insensitive)
+	// Filter feeds by display title (case-insensitive)
 	lowerQuery := strings.ToLower(m.searchQuery)
 	var filtered []database.GetFeedStatsRow
 	for _, feed := range m.unfilteredFeedList {
-		if strings.Contains(strings.ToLower(feed.Title), lowerQuery) {
+		displayTitle := getDisplayTitle(feed)
+		if strings.Contains(strings.ToLower(displayTitle), lowerQuery) {
 			filtered = append(filtered, feed)
 		}
 	}
@@ -1625,8 +1642,11 @@ func (m Model) renderFeedList() string {
 		countStr := fmt.Sprintf("(%d/%d)", feed.UnreadItems, feed.TotalItems)
 		paddedCount := fmt.Sprintf("%9s", countStr)
 
+		// Get display title - override for GitHub and GitLab feeds
+		displayTitle := getDisplayTitle(feed)
+
 		// Construct the line: status (emoji or 2 spaces) + spinner (2 chars) + count (9 chars) + space + feed title
-		line := statusEmoji + spinner + paddedCount + " " + feed.Title
+		line := statusEmoji + spinner + paddedCount + " " + displayTitle
 
 		// Apply highlighting
 		if i == m.cursor {
@@ -2409,6 +2429,12 @@ func (m Model) renderHelpView() string {
 	content.WriteString("  🕓              Pending task\n")
 	content.WriteString("  🔄              Running task\n")
 	content.WriteString("  💥              Failed task\n")
+	content.WriteString("\n")
+
+	// Environment Variables section
+	content.WriteString("Environment Variables\n")
+	content.WriteString("  GITHUB_FEED_TOKEN   Access token for private GitHub repository feeds\n")
+	content.WriteString("  GITLAB_FEED_TOKEN   Access token for private GitLab repository feeds\n")
 
 	// Split content into lines
 	allLines := strings.Split(content.String(), "\n")

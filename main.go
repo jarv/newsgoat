@@ -39,6 +39,9 @@ func main() {
 		fmt.Fprintf(os.Stderr, "  add <url>    Add a feed URL to the URLs file\n\n")
 		fmt.Fprintf(os.Stderr, "Options:\n")
 		flag.PrintDefaults()
+		fmt.Fprintf(os.Stderr, "\nEnvironment Variables:\n")
+		fmt.Fprintf(os.Stderr, "  GITHUB_FEED_TOKEN   Access token for private GitHub repository feeds\n")
+		fmt.Fprintf(os.Stderr, "  GITLAB_FEED_TOKEN   Access token for private GitLab repository feeds\n")
 	}
 
 	var feedTest = flag.Bool("feedTest", false, "Run feed test harness server")
