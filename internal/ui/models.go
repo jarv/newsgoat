@@ -2239,11 +2239,19 @@ func (m Model) renderLogDetail() string {
 		var attrs map[string]interface{}
 		if err := json.Unmarshal([]byte(m.currentLog.Attributes.String), &attrs); err == nil {
 			// Successfully parsed JSON - pretty print each attribute
-			// Print attributes (skip source_file and source_line as they always point to logger.go)
-			for key, value := range attrs {
+			// Sort keys to ensure consistent ordering
+			keys := make([]string, 0, len(attrs))
+			for key := range attrs {
 				if key == "source_file" || key == "source_line" {
 					continue // Skip source attributes
 				}
+				keys = append(keys, key)
+			}
+			sort.Strings(keys)
+
+			// Print attributes in sorted order
+			for _, key := range keys {
+				value := attrs[key]
 
 				// Format the value as a string
 				valueStr := fmt.Sprintf("%v", value)
