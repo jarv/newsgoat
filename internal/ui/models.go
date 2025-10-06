@@ -2175,6 +2175,16 @@ func (m Model) renderLogList() string {
 
 		line := timestampStr + "  " + log.Message
 
+		// Parse attributes to check for error
+		if log.Attributes.Valid && log.Attributes.String != "" {
+			var attrs map[string]interface{}
+			if err := json.Unmarshal([]byte(log.Attributes.String), &attrs); err == nil {
+				if errMsg, ok := attrs["error"]; ok {
+					line += " | error: " + fmt.Sprintf("%v", errMsg)
+				}
+			}
+		}
+
 		// Apply highlighting
 		line = m.applyHighlight(line, i == m.cursor)
 
