@@ -1,3 +1,17 @@
+# [1.7.0](https://github.com/jarv/newsgoat/compare/v1.6.4...v1.7.0) (2025-10-06)
+
+
+### Bug Fixes
+
+* Fixes log view attribute display ([87737a2](https://github.com/jarv/newsgoat/commit/87737a296ccd1a2f183ae62362888b34bc9abf06))
+* Fixes status bar positioning on log messages ([f674d01](https://github.com/jarv/newsgoat/commit/f674d0182b94d45a82e48c2e96f43451907ec1ad))
+
+
+### Features
+
+* Feed auto-discovery for GitLab and GitHub URLs ([fb3626a](https://github.com/jarv/newsgoat/commit/fb3626a46eef56583ad0a2c2661f783e0f8b7ed4))
+* Improve log summaries in the log view ([17cd932](https://github.com/jarv/newsgoat/commit/17cd932d997d51e4087091aff0bf7784aae6a623))
+
 ## [1.6.4](https://github.com/jarv/newsgoat/compare/v1.6.3...v1.6.4) (2025-10-06)
 
 
