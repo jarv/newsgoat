@@ -59,7 +59,9 @@ var SettingsViewKeys = ViewKeyBindings{
 
 var TasksViewKeys = ViewKeyBindings{
 	AllowedKeys: []string{"c", "d", "l"},
-	StatusBar:   []KeyBinding{},
+	StatusBar: []KeyBinding{
+		{Key: "A", Description: "clear failed"},
+	},
 }
 
 var FeedInfoViewKeys = ViewKeyBindings{
@@ -69,7 +71,9 @@ var FeedInfoViewKeys = ViewKeyBindings{
 
 var LogViewKeys = ViewKeyBindings{
 	AllowedKeys: []string{"c"},
-	StatusBar:   []KeyBinding{},
+	StatusBar: []KeyBinding{
+		{Key: "A", Description: "clear all"},
+	},
 }
 
 var URLsViewKeys = ViewKeyBindings{

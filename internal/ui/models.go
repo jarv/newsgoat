@@ -2287,6 +2287,14 @@ func (m Model) renderLogDetail() string {
 		b.WriteString("\n")
 	}
 
+	// Calculate padding to push status bar to bottom
+	contentLines := strings.Count(b.String(), "\n")
+	padding := m.height - contentLines - 1 // -1 for status bar
+	if padding < 0 {
+		padding = 0
+	}
+	b.WriteString(strings.Repeat("\n", padding))
+
 	b.WriteString(m.getHelpStyle().Render("h: help"))
 
 	return b.String()
