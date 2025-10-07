@@ -243,7 +243,7 @@ SELECT
     f.last_error,
     f.last_error_time,
     COUNT(i.id) as total_items,
-    COUNT(CASE WHEN COALESCE(rs.read, FALSE) = FALSE THEN 1 END) as unread_items
+    COUNT(CASE WHEN i.id IS NOT NULL AND COALESCE(rs.read, FALSE) = FALSE THEN 1 END) as unread_items
 FROM feeds f
 LEFT JOIN items i ON f.id = i.feed_id
 LEFT JOIN read_status rs ON i.id = rs.item_id
