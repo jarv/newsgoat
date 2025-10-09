@@ -1,3 +1,11 @@
+# [1.8.0](https://github.com/jarv/newsgoat/compare/v1.7.3...v1.8.0) (2025-10-09)
+
+
+### Features
+
+* Adds folders for grouping feeds ([18ac04c](https://github.com/jarv/newsgoat/commit/18ac04c3efb5c24949958c93254950733663e3a7))
+* Adds logic for db schema migrations ([4d94a18](https://github.com/jarv/newsgoat/commit/4d94a18b764bdbefccf5ed885802457c4980bbd5))
+
 ## [1.7.3](https://github.com/jarv/newsgoat/compare/v1.7.2...v1.7.3) (2025-10-08)
 
 
