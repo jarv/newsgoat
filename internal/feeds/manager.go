@@ -401,11 +401,17 @@ func (m *Manager) RefreshFeed(feedID int64) error {
 			}
 		}
 
+		// Use GUID if available, otherwise use Link as unique identifier
+		guid := item.GUID
+		if guid == "" {
+			guid = item.Link
+		}
+
 		// Upsert item
 		m.dbMutex.Lock()
 		_, err := m.queries.UpsertItem(context.Background(), database.UpsertItemParams{
 			FeedID:      feedID,
-			Guid:        item.GUID,
+			Guid:        guid,
 			Title:       item.Title,
 			Description: description,
 			Content:     content,
@@ -414,7 +420,7 @@ func (m *Manager) RefreshFeed(feedID int64) error {
 		})
 		m.dbMutex.Unlock()
 		if err != nil {
-			logging.Error("Error upserting item", "guid", item.GUID, "error", err)
+			logging.Error("Error upserting item", "guid", guid, "error", err)
 		}
 	}
 
