@@ -103,7 +103,9 @@ func getAppliedMigrations(db *sql.DB) (map[int]bool, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 
 	for rows.Next() {
 		var version int
@@ -129,7 +131,9 @@ func applyMigration(db *sql.DB, version int, file string) error {
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() {
+		_ = tx.Rollback()
+	}()
 
 	// Execute migration SQL
 	if _, err := tx.Exec(string(content)); err != nil {
