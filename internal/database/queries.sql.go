@@ -10,6 +10,22 @@ import (
 	"database/sql"
 )
 
+const addFeedFolder = `-- name: AddFeedFolder :exec
+INSERT INTO feed_folders (feed_id, folder_name)
+VALUES (?, ?)
+ON CONFLICT(feed_id, folder_name) DO NOTHING
+`
+
+type AddFeedFolderParams struct {
+	FeedID     int64  `json:"feed_id"`
+	FolderName string `json:"folder_name"`
+}
+
+func (q *Queries) AddFeedFolder(ctx context.Context, arg AddFeedFolderParams) error {
+	_, err := q.db.ExecContext(ctx, addFeedFolder, arg.FeedID, arg.FolderName)
+	return err
+}
+
 const clearFeedError = `-- name: ClearFeedError :exec
 UPDATE feeds
 SET last_error = NULL, last_error_time = NULL
@@ -142,6 +158,15 @@ func (q *Queries) DeleteFeed(ctx context.Context, id int64) error {
 	return err
 }
 
+const deleteFeedFolders = `-- name: DeleteFeedFolders :exec
+DELETE FROM feed_folders WHERE feed_id = ?
+`
+
+func (q *Queries) DeleteFeedFolders(ctx context.Context, feedID int64) error {
+	_, err := q.db.ExecContext(ctx, deleteFeedFolders, feedID)
+	return err
+}
+
 const deleteItemsByFeed = `-- name: DeleteItemsByFeed :exec
 DELETE FROM items WHERE feed_id = ?
 `
@@ -235,6 +260,33 @@ func (q *Queries) GetFeedByURL(ctx context.Context, url string) (Feed, error) {
 	return i, err
 }
 
+const getFeedFolders = `-- name: GetFeedFolders :many
+SELECT folder_name FROM feed_folders WHERE feed_id = ? ORDER BY folder_name
+`
+
+func (q *Queries) GetFeedFolders(ctx context.Context, feedID int64) ([]string, error) {
+	rows, err := q.db.QueryContext(ctx, getFeedFolders, feedID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var folder_name string
+		if err := rows.Scan(&folder_name); err != nil {
+			return nil, err
+		}
+		items = append(items, folder_name)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getFeedStats = `-- name: GetFeedStats :many
 SELECT
     f.id,
@@ -280,6 +332,49 @@ func (q *Queries) GetFeedStats(ctx context.Context) ([]GetFeedStatsRow, error) {
 			&i.TotalItems,
 			&i.UnreadItems,
 		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getFolderStats = `-- name: GetFolderStats :many
+SELECT
+    ff.folder_name,
+    COUNT(DISTINCT i.id) as total_items,
+    COUNT(DISTINCT CASE WHEN i.id IS NOT NULL AND COALESCE(rs.read, FALSE) = FALSE THEN i.id END) as unread_items
+FROM feed_folders ff
+INNER JOIN feeds f ON ff.feed_id = f.id
+LEFT JOIN items i ON f.id = i.feed_id
+LEFT JOIN read_status rs ON i.id = rs.item_id
+WHERE f.visible = TRUE
+GROUP BY ff.folder_name
+ORDER BY ff.folder_name
+`
+
+type GetFolderStatsRow struct {
+	FolderName  string `json:"folder_name"`
+	TotalItems  int64  `json:"total_items"`
+	UnreadItems int64  `json:"unread_items"`
+}
+
+func (q *Queries) GetFolderStats(ctx context.Context) ([]GetFolderStatsRow, error) {
+	rows, err := q.db.QueryContext(ctx, getFolderStats)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetFolderStatsRow
+	for rows.Next() {
+		var i GetFolderStatsRow
+		if err := rows.Scan(&i.FolderName, &i.TotalItems, &i.UnreadItems); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

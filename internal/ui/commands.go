@@ -4,6 +4,7 @@ import (
 	"context"
 	"os/exec"
 	"runtime"
+	"strings"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -138,6 +139,42 @@ func markAllItemsReadInFeed(feedManager *feeds.Manager, feedID int64) tea.Cmd {
 			return ErrorMsg{Err: err}
 		}
 		return AllItemsMarkedReadMsg{FeedID: feedID}
+	}
+}
+
+func markAllItemsReadInFolder(feedManager *feeds.Manager, queries *database.Queries, folderName string) tea.Cmd {
+	return func() tea.Msg {
+		ctx := context.Background()
+
+		// Get all feeds in this folder
+		allFeeds, err := feedManager.GetAllFeeds()
+		if err != nil {
+			logging.Error("Error getting feeds for folder", "folder", folderName, "error", err)
+			return ErrorMsg{Err: err}
+		}
+
+		// Mark all items in each feed as read
+		for _, feed := range allFeeds {
+			// Check if this feed is in the folder
+			folders, err := queries.GetFeedFolders(ctx, feed.ID)
+			if err != nil {
+				continue
+			}
+
+			// Check if folder matches
+			for _, f := range folders {
+				if f == folderName {
+					// Mark all items in this feed as read
+					if err := feedManager.MarkAllItemsReadInFeed(feed.ID); err != nil {
+						logging.Error("Error marking feed items as read", "feedID", feed.ID, "error", err)
+					}
+					break
+				}
+			}
+		}
+
+		// Reload feed list to show updated counts
+		return loadFeedList(feedManager)()
 	}
 }
 
@@ -278,16 +315,38 @@ func openURLsFileInEditor() tea.Cmd {
 	})
 }
 
-func addURLAndDiscover(feedManager *feeds.Manager, urlArg string) tea.Cmd {
+func addURLAndDiscover(feedManager *feeds.Manager, input string) tea.Cmd {
 	return func() tea.Msg {
+		// Parse input: URL followed by optional folders
+		// Format: <url> folder1,folder2 or <url> "folder with spaces",folder3
+		parts := strings.Fields(input)
+		if len(parts) == 0 {
+			return URLAddErrorMsg{Err: "No URL provided"}
+		}
+
+		urlArg := parts[0]
+		var folderStr string
+		if len(parts) > 1 {
+			// Join remaining parts as folder string
+			folderStr = strings.Join(parts[1:], " ")
+		}
+
 		// Try to discover the feed URL
 		feedURL, err := discovery.DiscoverFeed(urlArg)
 		if err != nil {
 			return URLAddErrorMsg{Err: "Failed to discover feed: " + err.Error()}
 		}
 
-		// Add the URL to the URLs file
-		if err := config.AddURL(feedURL); err != nil {
+		// Build the full line to add to URLs file
+		var fullLine string
+		if folderStr != "" {
+			fullLine = feedURL + " " + folderStr
+		} else {
+			fullLine = feedURL
+		}
+
+		// Add the URL with folders to the URLs file
+		if err := config.AddURLLine(fullLine); err != nil {
 			return URLAddErrorMsg{Err: "Failed to add URL to file: " + err.Error()}
 		}
 
@@ -301,8 +360,10 @@ func addURLAndDiscover(feedManager *feeds.Manager, urlArg string) tea.Cmd {
 	}
 }
 
-func syncFeedsWithURLs(feedManager *feeds.Manager, urls []string) tea.Cmd {
+func syncFeedsWithURLs(feedManager *feeds.Manager, queries *database.Queries, urlEntries []config.URLEntry) tea.Cmd {
 	return func() tea.Msg {
+		ctx := context.Background()
+
 		// Get all feeds from database
 		allFeeds, err := feedManager.GetAllFeeds()
 		if err != nil {
@@ -310,10 +371,10 @@ func syncFeedsWithURLs(feedManager *feeds.Manager, urls []string) tea.Cmd {
 			return ErrorMsg{Err: err}
 		}
 
-		// Create a set of URLs from the file for quick lookup
-		urlsFromFileSet := make(map[string]bool)
-		for _, url := range urls {
-			urlsFromFileSet[url] = true
+		// Create a map of URLs from the file for quick lookup
+		urlsFromFileSet := make(map[string]config.URLEntry)
+		for _, entry := range urlEntries {
+			urlsFromFileSet[entry.URL] = entry
 		}
 
 		// Create a set of URLs from DB for quick lookup
@@ -324,24 +385,57 @@ func syncFeedsWithURLs(feedManager *feeds.Manager, urls []string) tea.Cmd {
 
 		// Hide feeds that are in DB but not in URLs file
 		for _, feed := range allFeeds {
-			if !urlsFromFileSet[feed.Url] {
+			if _, exists := urlsFromFileSet[feed.Url]; !exists {
 				if err := feedManager.HideFeedByURL(feed.Url); err != nil {
 					logging.Warn("Failed to hide feed", "url", feed.Url, "error", err)
 				}
 			}
 		}
 
-		// Show/Add feeds that are in URLs file
-		for _, url := range urls {
-			if urlsFromDBSet[url] {
+		// Show/Add feeds that are in URLs file and update folders
+		for _, entry := range urlEntries {
+			var feedID int64
+			if urlsFromDBSet[entry.URL] {
 				// Feed exists in DB, make sure it's visible
-				if err := feedManager.ShowFeedByURL(url); err != nil {
-					logging.Warn("Failed to show feed", "url", url, "error", err)
+				if err := feedManager.ShowFeedByURL(entry.URL); err != nil {
+					logging.Warn("Failed to show feed", "url", entry.URL, "error", err)
+					continue
 				}
+				// Get feed ID
+				feed, err := queries.GetFeedByURL(ctx, entry.URL)
+				if err != nil {
+					logging.Warn("Failed to get feed by URL", "url", entry.URL, "error", err)
+					continue
+				}
+				feedID = feed.ID
 			} else {
 				// Feed doesn't exist, add it without fetching
-				if err := feedManager.AddFeedWithoutFetching(url); err != nil {
-					logging.Warn("Failed to add feed", "url", url, "error", err)
+				if err := feedManager.AddFeedWithoutFetching(entry.URL); err != nil {
+					logging.Warn("Failed to add feed", "url", entry.URL, "error", err)
+					continue
+				}
+				// Get the newly created feed ID
+				feed, err := queries.GetFeedByURL(ctx, entry.URL)
+				if err != nil {
+					logging.Warn("Failed to get newly created feed", "url", entry.URL, "error", err)
+					continue
+				}
+				feedID = feed.ID
+			}
+
+			// Update folders for this feed
+			// First, delete existing folders
+			if err := queries.DeleteFeedFolders(ctx, feedID); err != nil {
+				logging.Warn("Failed to delete old folders", "feed_id", feedID, "error", err)
+			}
+
+			// Then add new folders
+			for _, folder := range entry.Folders {
+				if err := queries.AddFeedFolder(ctx, database.AddFeedFolderParams{
+					FeedID:     feedID,
+					FolderName: folder,
+				}); err != nil {
+					logging.Warn("Failed to add folder", "feed_id", feedID, "folder", folder, "error", err)
 				}
 			}
 		}
@@ -350,4 +444,3 @@ func syncFeedsWithURLs(feedManager *feeds.Manager, urls []string) tea.Cmd {
 		return loadFeedList(feedManager)()
 	}
 }
-

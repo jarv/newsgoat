@@ -170,23 +170,23 @@ func run(urlFile string, debug bool) error {
 		urlsPath = ""
 	}
 
-	var urls []string
+	var urlEntries []config.URLEntry
 	if urlFile != "" {
 		var readErr error
-		urls, readErr = config.ReadURLsFileFromPath(urlFile)
+		urlEntries, readErr = config.ReadURLsFileFromPath(urlFile)
 		if readErr != nil {
 			return fmt.Errorf("failed to read URLs file: %w", readErr)
 		}
 		urlsPath = urlFile
 	} else {
 		var readErr error
-		urls, readErr = config.ReadURLsFile()
+		urlEntries, readErr = config.ReadURLsFile()
 		if readErr != nil {
 			return fmt.Errorf("failed to read URLs file: %w", readErr)
 		}
 	}
 
-	if err := syncFeedsWithURLsFile(feedManager, urls); err != nil {
+	if err := syncFeedsWithURLsFile(feedManager, queries, urlEntries); err != nil {
 		logger.Warn("Failed to sync feeds with URLs file", "error", err)
 	}
 
@@ -201,17 +201,17 @@ func run(urlFile string, debug bool) error {
 	return nil
 }
 
-func syncFeedsWithURLsFile(feedManager *feeds.Manager, urlsFromFile []string) error {
+func syncFeedsWithURLsFile(feedManager *feeds.Manager, queries *database.Queries, urlEntries []config.URLEntry) error {
 	// Get all feeds from database (including hidden ones)
 	allFeeds, err := feedManager.GetAllFeeds()
 	if err != nil {
 		return fmt.Errorf("failed to get all feeds: %w", err)
 	}
 
-	// Create a set of URLs from the file for quick lookup
-	urlsFromFileSet := make(map[string]bool)
-	for _, url := range urlsFromFile {
-		urlsFromFileSet[url] = true
+	// Create a map of URLs from the file for quick lookup
+	urlsFromFileSet := make(map[string]config.URLEntry)
+	for _, entry := range urlEntries {
+		urlsFromFileSet[entry.URL] = entry
 	}
 
 	// Create a set of URLs from DB for quick lookup
@@ -222,24 +222,58 @@ func syncFeedsWithURLsFile(feedManager *feeds.Manager, urlsFromFile []string) er
 
 	// Hide feeds that are in DB but not in URLs file
 	for _, feed := range allFeeds {
-		if !urlsFromFileSet[feed.Url] {
+		if _, exists := urlsFromFileSet[feed.Url]; !exists {
 			if err := feedManager.HideFeedByURL(feed.Url); err != nil {
 				logger.Warn("Failed to hide feed", "url", feed.Url, "error", err)
 			}
 		}
 	}
 
-	// Show/Add feeds that are in URLs file
-	for _, url := range urlsFromFile {
-		if urlsFromDBSet[url] {
+	// Show/Add feeds that are in URLs file and update folders
+	ctx := context.Background()
+	for _, entry := range urlEntries {
+		var feedID int64
+		if urlsFromDBSet[entry.URL] {
 			// Feed exists in DB, make sure it's visible
-			if err := feedManager.ShowFeedByURL(url); err != nil {
-				logger.Warn("Failed to show feed", "url", url, "error", err)
+			if err := feedManager.ShowFeedByURL(entry.URL); err != nil {
+				logger.Warn("Failed to show feed", "url", entry.URL, "error", err)
+				continue
 			}
+			// Get feed ID
+			feed, err := queries.GetFeedByURL(ctx, entry.URL)
+			if err != nil {
+				logger.Warn("Failed to get feed by URL", "url", entry.URL, "error", err)
+				continue
+			}
+			feedID = feed.ID
 		} else {
 			// Feed doesn't exist, add it without fetching
-			if err := feedManager.AddFeedWithoutFetching(url); err != nil {
-				logger.Warn("Failed to add feed", "url", url, "error", err)
+			if err := feedManager.AddFeedWithoutFetching(entry.URL); err != nil {
+				logger.Warn("Failed to add feed", "url", entry.URL, "error", err)
+				continue
+			}
+			// Get the newly created feed ID
+			feed, err := queries.GetFeedByURL(ctx, entry.URL)
+			if err != nil {
+				logger.Warn("Failed to get newly created feed", "url", entry.URL, "error", err)
+				continue
+			}
+			feedID = feed.ID
+		}
+
+		// Update folders for this feed
+		// First, delete existing folders
+		if err := queries.DeleteFeedFolders(ctx, feedID); err != nil {
+			logger.Warn("Failed to delete old folders", "feed_id", feedID, "error", err)
+		}
+
+		// Then add new folders
+		for _, folder := range entry.Folders {
+			if err := queries.AddFeedFolder(ctx, database.AddFeedFolderParams{
+				FeedID:     feedID,
+				FolderName: folder,
+			}); err != nil {
+				logger.Warn("Failed to add folder", "feed_id", feedID, "folder", folder, "error", err)
 			}
 		}
 	}

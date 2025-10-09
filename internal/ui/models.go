@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -16,6 +17,7 @@ import (
 	"github.com/jarv/newsgoat/internal/database"
 	"github.com/jarv/newsgoat/internal/discovery"
 	"github.com/jarv/newsgoat/internal/feeds"
+	"github.com/jarv/newsgoat/internal/logging"
 	"github.com/jarv/newsgoat/internal/tasks"
 	"github.com/jarv/newsgoat/internal/themes"
 	"github.com/jarv/newsgoat/internal/version"
@@ -96,6 +98,17 @@ func wrapText(text string, width int) []string {
 	return lines
 }
 
+// FeedListItem represents an item in the feed list (either a folder or a feed)
+type FeedListItem struct {
+	IsFolder     bool
+	FolderName   string
+	Feed         *database.GetFeedStatsRow
+	UnreadItems  int64
+	TotalItems   int64
+	IsExpanded   bool
+	IsUnderFolder bool // True if this feed is displayed under a folder
+}
+
 // getDisplayTitle returns the display title for a feed, overriding for GitHub/GitLab
 func getDisplayTitle(feed database.GetFeedStatsRow) string {
 	switch discovery.GetURLType(feed.Url) {
@@ -119,13 +132,21 @@ func (m *Model) filterFeedsBySearch() {
 		return
 	}
 
-	// Filter feeds by display title (case-insensitive)
+	// Filter items by search query (case-insensitive)
 	lowerQuery := strings.ToLower(m.searchQuery)
-	var filtered []database.GetFeedStatsRow
-	for _, feed := range m.unfilteredFeedList {
-		displayTitle := getDisplayTitle(feed)
-		if strings.Contains(strings.ToLower(displayTitle), lowerQuery) {
-			filtered = append(filtered, feed)
+	var filtered []FeedListItem
+	for _, item := range m.unfilteredFeedList {
+		if item.IsFolder {
+			// Check folder name
+			if strings.Contains(strings.ToLower(item.FolderName), lowerQuery) {
+				filtered = append(filtered, item)
+			}
+		} else {
+			// Check feed title
+			displayTitle := getDisplayTitle(*item.Feed)
+			if strings.Contains(strings.ToLower(displayTitle), lowerQuery) {
+				filtered = append(filtered, item)
+			}
 		}
 	}
 	m.feedList = filtered
@@ -154,16 +175,18 @@ type Model struct {
 	glamourRenderer                 *glamour.TermRenderer
 	state                           ViewState
 	previousState                   ViewState // Store previous state when entering help view
-	feedList                        []database.GetFeedStatsRow
+	feedList                        []FeedListItem
 	allFeeds                        []database.GetFeedStatsRow // Unfiltered list of all feeds (for reload operations)
-	totalFeedCount                  int                        // Total number of feeds in database (before filtering)
+	expandedFolders                 map[string]bool            // Track which folders are expanded
+	folderStats                     map[string]struct{ UnreadItems, TotalItems int64 }
+	totalFeedCount                  int // Total number of feeds in database (before filtering)
 	itemList                        []database.GetItemsWithReadStatusRow
 	currentItem                     database.GetItemsWithReadStatusRow
 	currentFeed                     database.Feed // For feed info view
 	logList                         []database.LogMessage
 	currentLog                      database.LogMessage
 	taskList                        []*tasks.Task
-	urlsList                        []string
+	urlsList                        []config.URLEntry
 	urlsFilePath                    string
 	links                           []string
 	cursor                          int
@@ -181,44 +204,44 @@ type Model struct {
 	err                             error
 	refreshing                      bool
 	refreshStatus                   string
-	refreshingFeeds                 map[int64]bool             // Track which feeds are currently refreshing
-	pendingFeeds                    []int64                    // Feeds waiting to be refreshed (for refresh-all)
-	maxConcurrency                  int                        // Max concurrent refreshes allowed
-	spinnerFrame                    int                        // Current spinner animation frame
-	spinnerRunning                  bool                       // Track if spinner timer is already running
-	firstAutoReload                 bool                       // Track if this is the first auto reload (for SuppressFirstReload)
-	pendingStartupReload            bool                       // Track if we need to reload on startup after feed list loads
-	nextReloadTime                  time.Time                  // Time when next auto reload is scheduled
-	editingSettings                 bool                       // Track if we're editing a setting
-	selectingTheme                  bool                       // Track if we're selecting a theme
-	selectingHighlight              bool                       // Track if we're selecting a highlight style
-	selectingSpinner                bool                       // Track if we're selecting a spinner type
-	selectingShowReadFeeds          bool                       // Track if we're selecting show read feeds
-	selectingAutoReload             bool                       // Track if we're selecting auto reload
-	selectingSuppressFirstReload    bool                       // Track if we're selecting suppress first reload
-	selectingReloadOnStartup        bool                       // Track if we're selecting reload on startup
-	selectingUnreadOnTop            bool                       // Track if we're selecting unread on top
-	showRawHTML                     bool                       // Track if showing raw HTML in article view
-	themeSelectCursor               int                        // Cursor position in theme selector
-	highlightSelectCursor           int                        // Cursor position in highlight style selector
-	spinnerSelectCursor             int                        // Cursor position in spinner type selector
-	showReadFeedsSelectCursor       int                        // Cursor position in show read feeds selector
-	autoReloadSelectCursor          int                        // Cursor position in auto reload selector
-	suppressFirstReloadSelectCursor int                        // Cursor position in suppress first reload selector
-	reloadOnStartupSelectCursor     int                        // Cursor position in reload on startup selector
-	unreadOnTopSelectCursor         int                        // Cursor position in unread on top selector
-	settingInput                    string                     // Current input value when editing
-	showSettingsHelp                bool                       // Track if we're showing settings help
-	searchMode                      bool                       // Track if search mode is active
-	searchQuery                     string                     // Current search query text
-	searchActive                    bool                       // Track if feeds are currently filtered by search
-	unfilteredFeedList              []database.GetFeedStatsRow // Feed list before search filtering
-	statusMessage                   string                     // Message to display above status bar
-	statusMessageType               string                     // Type of message: "error" or "info"
-	quitPressed                     bool                       // Track if 'q' was pressed once (for quit confirmation)
-	ctrlCPressed                    bool                       // Track if 'ctrl+c' was pressed once (for quit confirmation)
-	addingURL                       bool                       // Track if in URL adding mode
-	urlInput                        string                     // Current URL input text
+	refreshingFeeds                 map[int64]bool    // Track which feeds are currently refreshing
+	pendingFeeds                    []int64           // Feeds waiting to be refreshed (for refresh-all)
+	maxConcurrency                  int            // Max concurrent refreshes allowed
+	spinnerFrame                    int            // Current spinner animation frame
+	spinnerRunning                  bool           // Track if spinner timer is already running
+	firstAutoReload                 bool           // Track if this is the first auto reload (for SuppressFirstReload)
+	pendingStartupReload            bool           // Track if we need to reload on startup after feed list loads
+	nextReloadTime                  time.Time      // Time when next auto reload is scheduled
+	editingSettings                 bool           // Track if we're editing a setting
+	selectingTheme                  bool           // Track if we're selecting a theme
+	selectingHighlight              bool           // Track if we're selecting a highlight style
+	selectingSpinner                bool           // Track if we're selecting a spinner type
+	selectingShowReadFeeds          bool           // Track if we're selecting show read feeds
+	selectingAutoReload             bool           // Track if we're selecting auto reload
+	selectingSuppressFirstReload    bool           // Track if we're selecting suppress first reload
+	selectingReloadOnStartup        bool           // Track if we're selecting reload on startup
+	selectingUnreadOnTop            bool           // Track if we're selecting unread on top
+	showRawHTML                     bool           // Track if showing raw HTML in article view
+	themeSelectCursor               int            // Cursor position in theme selector
+	highlightSelectCursor           int            // Cursor position in highlight style selector
+	spinnerSelectCursor             int            // Cursor position in spinner type selector
+	showReadFeedsSelectCursor       int            // Cursor position in show read feeds selector
+	autoReloadSelectCursor          int            // Cursor position in auto reload selector
+	suppressFirstReloadSelectCursor int            // Cursor position in suppress first reload selector
+	reloadOnStartupSelectCursor     int            // Cursor position in reload on startup selector
+	unreadOnTopSelectCursor         int            // Cursor position in unread on top selector
+	settingInput                    string         // Current input value when editing
+	showSettingsHelp                bool           // Track if we're showing settings help
+	searchMode                      bool           // Track if search mode is active
+	searchQuery                     string         // Current search query text
+	searchActive                    bool           // Track if feeds are currently filtered by search
+	unfilteredFeedList              []FeedListItem // Feed list before search filtering
+	statusMessage                   string         // Message to display above status bar
+	statusMessageType               string         // Type of message: "error" or "info"
+	quitPressed                     bool           // Track if 'q' was pressed once (for quit confirmation)
+	ctrlCPressed                    bool           // Track if 'ctrl+c' was pressed once (for quit confirmation)
+	addingURL                       bool           // Track if in URL adding mode
+	urlInput                        string         // Current URL input text
 }
 
 type RefreshMsg struct {
@@ -272,12 +295,12 @@ type TaskListLoadedMsg struct {
 }
 
 type URLsListLoadedMsg struct {
-	URLs     []string
+	URLs     []config.URLEntry
 	FilePath string
 }
 
 type URLsReloadedMsg struct {
-	URLs     []string
+	URLs     []config.URLEntry
 	FilePath string
 }
 
@@ -347,6 +370,8 @@ func NewModel(feedManager *feeds.Manager, taskManager tasks.Manager, queries *da
 		spinnerRunning:       false,
 		firstAutoReload:      true,                // First reload should be suppressed if configured
 		pendingStartupReload: cfg.ReloadOnStartup, // Will trigger reload after feed list loads
+		expandedFolders:      make(map[string]bool),
+		folderStats:          make(map[string]struct{ UnreadItems, TotalItems int64 }),
 	}
 }
 
@@ -401,25 +426,24 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.totalFeedCount = len(msg.Feeds)
 
 		// Filter feeds based on ShowReadFeeds config
+		var feedsToDisplay []database.GetFeedStatsRow
 		if m.config.ShowReadFeeds {
-			m.feedList = msg.Feeds
+			feedsToDisplay = msg.Feeds
 		} else {
 			// Filter out feeds with no unread items
-			var filteredFeeds []database.GetFeedStatsRow
 			for _, feed := range msg.Feeds {
 				if feed.UnreadItems > 0 {
-					filteredFeeds = append(filteredFeeds, feed)
+					feedsToDisplay = append(feedsToDisplay, feed)
 				}
 			}
-			m.feedList = filteredFeeds
 		}
 
-		// Sort feeds if UnreadOnTop is enabled
+		// Sort feeds if UnreadOnTop is enabled (before building display list)
 		if m.config.UnreadOnTop {
-			sort.SliceStable(m.feedList, func(i, j int) bool {
+			sort.SliceStable(feedsToDisplay, func(i, j int) bool {
 				// Feeds with unread items come first
-				iHasUnread := m.feedList[i].UnreadItems > 0
-				jHasUnread := m.feedList[j].UnreadItems > 0
+				iHasUnread := feedsToDisplay[i].UnreadItems > 0
+				jHasUnread := feedsToDisplay[j].UnreadItems > 0
 				if iHasUnread != jHasUnread {
 					return iHasUnread
 				}
@@ -427,6 +451,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return false
 			})
 		}
+
+		// Build display list with folders
+		m.buildFeedDisplayList(feedsToDisplay)
 
 		if m.state == FeedListView {
 			// Preserve cursor position when refreshing feed list
@@ -506,7 +533,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.statusMessage = "urls reloaded from " + msg.FilePath
 		m.statusMessageType = "info"
 		// Sync feeds with the reloaded URLs
-		return m, syncFeedsWithURLs(m.feedManager, msg.URLs)
+		return m, syncFeedsWithURLs(m.feedManager, m.queries, msg.URLs)
 
 	case EditorFinishedMsg:
 		// After editor closes, reload URLs and sync feeds
@@ -952,6 +979,59 @@ func (m Model) handleFeedListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.savedFeedCursor = 0
 			return m, nil
 		}
+
+		// If on a folder or a feed inside a folder, collapse the folder
+		if len(m.feedList) > 0 && m.cursor < len(m.feedList) {
+			item := m.feedList[m.cursor]
+
+			if item.IsFolder && item.IsExpanded {
+				// Collapse this folder
+				m.expandedFolders[item.FolderName] = false
+
+				// Rebuild display list
+				var feedsToDisplay []database.GetFeedStatsRow
+				if m.config.ShowReadFeeds {
+					feedsToDisplay = m.allFeeds
+				} else {
+					for _, feed := range m.allFeeds {
+						if feed.UnreadItems > 0 {
+							feedsToDisplay = append(feedsToDisplay, feed)
+						}
+					}
+				}
+				m.buildFeedDisplayList(feedsToDisplay)
+
+				// Keep cursor on the folder
+				return m, nil
+			} else if item.IsUnderFolder {
+				// Find the parent folder and collapse it
+				// Search backwards to find the folder
+				for i := m.cursor - 1; i >= 0; i-- {
+					if m.feedList[i].IsFolder {
+						folderName := m.feedList[i].FolderName
+						m.expandedFolders[folderName] = false
+
+						// Rebuild display list
+						var feedsToDisplay []database.GetFeedStatsRow
+						if m.config.ShowReadFeeds {
+							feedsToDisplay = m.allFeeds
+						} else {
+							for _, feed := range m.allFeeds {
+								if feed.UnreadItems > 0 {
+									feedsToDisplay = append(feedsToDisplay, feed)
+								}
+							}
+						}
+						m.buildFeedDisplayList(feedsToDisplay)
+
+						// Move cursor to the folder
+						m.cursor = i
+						return m, nil
+					}
+				}
+			}
+		}
+
 		// Otherwise, do nothing (don't quit in feed list view)
 		return m, nil
 
@@ -1018,15 +1098,57 @@ func (m Model) handleFeedListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case "enter":
 		if len(m.feedList) > 0 && m.cursor < len(m.feedList) {
-			// Clear search mode and filter when entering item list
-			m.searchMode = false
-			m.searchActive = false
-			m.searchQuery = ""
-			m.selectedFeed = m.feedList[m.cursor].ID
-			m.state = ItemListView
-			m.cursor = 0
-			m.savedItemCursor = 0
-			return m, loadItemList(m.feedManager, m.selectedFeed)
+			item := m.feedList[m.cursor]
+
+			if item.IsFolder {
+				// Toggle folder expansion
+				m.expandedFolders[item.FolderName] = !m.expandedFolders[item.FolderName]
+
+				// Rebuild display list
+				var feedsToDisplay []database.GetFeedStatsRow
+				if m.config.ShowReadFeeds {
+					feedsToDisplay = m.allFeeds
+				} else {
+					for _, feed := range m.allFeeds {
+						if feed.UnreadItems > 0 {
+							feedsToDisplay = append(feedsToDisplay, feed)
+						}
+					}
+				}
+
+				// Sort if needed
+				if m.config.UnreadOnTop {
+					sort.SliceStable(feedsToDisplay, func(i, j int) bool {
+						iHasUnread := feedsToDisplay[i].UnreadItems > 0
+						jHasUnread := feedsToDisplay[j].UnreadItems > 0
+						if iHasUnread != jHasUnread {
+							return iHasUnread
+						}
+						return false
+					})
+				}
+
+				m.buildFeedDisplayList(feedsToDisplay)
+
+				// Keep cursor on the folder
+				if m.cursor >= len(m.feedList) {
+					m.cursor = max(0, len(m.feedList)-1)
+				}
+				m.savedFeedCursor = m.cursor
+
+				return m, nil
+			} else {
+				// Enter feed item list
+				// Clear search mode and filter when entering item list
+				m.searchMode = false
+				m.searchActive = false
+				m.searchQuery = ""
+				m.selectedFeed = item.Feed.ID
+				m.state = ItemListView
+				m.cursor = 0
+				m.savedItemCursor = 0
+				return m, loadItemList(m.feedManager, m.selectedFeed)
+			}
 		}
 
 	case "R":
@@ -1048,19 +1170,54 @@ func (m Model) handleFeedListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case "r":
 		if !m.refreshing && len(m.feedList) > 0 && m.cursor < len(m.feedList) {
-			m.refreshing = true
-			m.refreshStatus = "Refreshing feed..."
+			item := m.feedList[m.cursor]
 
-			feed := m.feedList[m.cursor]
-			task := tasks.CreateFeedRefreshTask(feed.ID, feed.Url)
-			if err := m.taskManager.AddTask(task); err != nil {
-				// Handle error, maybe show error message
-				m.refreshing = false
-				m.refreshStatus = ""
-				return m, nil
+			if item.IsFolder {
+				// Refresh all feeds in this folder
+				m.refreshing = true
+				m.refreshStatus = "Refreshing folder..."
+
+				ctx := context.Background()
+				// Get all feeds
+				allFeeds, err := m.feedManager.GetAllFeeds()
+				if err != nil {
+					m.refreshing = false
+					m.refreshStatus = ""
+					return m, nil
+				}
+
+				// Find feeds in this folder and create tasks
+				for _, feed := range allFeeds {
+					folders, err := m.queries.GetFeedFolders(ctx, feed.ID)
+					if err == nil {
+						for _, folder := range folders {
+							if folder == item.FolderName {
+								task := tasks.CreateFeedRefreshTask(feed.ID, feed.Url)
+								if err := m.taskManager.AddTask(task); err != nil {
+									logging.Error("Failed to add refresh task", "feedID", feed.ID, "error", err)
+								}
+								break
+							}
+						}
+					}
+				}
+
+				return m, func() tea.Msg { return RefreshStartMsg{Status: "Refreshing folder..."} }
+			} else {
+				// Refresh single feed
+				m.refreshing = true
+				m.refreshStatus = "Refreshing feed..."
+
+				task := tasks.CreateFeedRefreshTask(item.Feed.ID, item.Feed.Url)
+				if err := m.taskManager.AddTask(task); err != nil {
+					// Handle error, maybe show error message
+					m.refreshing = false
+					m.refreshStatus = ""
+					return m, nil
+				}
+
+				return m, func() tea.Msg { return RefreshStartMsg{Status: "Refreshing feed..."} }
 			}
-
-			return m, func() tea.Msg { return RefreshStartMsg{Status: "Refreshing feed..."} }
 		}
 
 	case "l":
@@ -1098,17 +1255,25 @@ func (m Model) handleFeedListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, openURLsFileInEditor()
 
 	case "i":
-		// Show feed info
+		// Show feed info (only for feeds, not folders)
 		if len(m.feedList) > 0 && m.cursor < len(m.feedList) {
-			feedID := m.feedList[m.cursor].ID
-			return m, loadFeedInfo(m.queries, feedID)
+			item := m.feedList[m.cursor]
+			if !item.IsFolder {
+				return m, loadFeedInfo(m.queries, item.Feed.ID)
+			}
 		}
 
 	case "A":
-		// Mark all items in the highlighted feed as read
+		// Mark all items in the highlighted feed/folder as read
 		if len(m.feedList) > 0 && m.cursor < len(m.feedList) {
-			feedID := m.feedList[m.cursor].ID
-			return m, markAllItemsReadInFeed(m.feedManager, feedID)
+			item := m.feedList[m.cursor]
+			if item.IsFolder {
+				// Mark all feeds in this folder as read
+				return m, markAllItemsReadInFolder(m.feedManager, m.queries, item.FolderName)
+			} else {
+				// Mark all items in single feed as read
+				return m, markAllItemsReadInFeed(m.feedManager, item.Feed.ID)
+			}
 		}
 
 	case "/":
@@ -1116,7 +1281,7 @@ func (m Model) handleFeedListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.searchMode = true
 		m.searchQuery = ""
 		// Save current feed list to restore on cancel
-		m.unfilteredFeedList = make([]database.GetFeedStatsRow, len(m.feedList))
+		m.unfilteredFeedList = make([]FeedListItem, len(m.feedList))
 		copy(m.unfilteredFeedList, m.feedList)
 		return m, nil
 	}
@@ -1462,6 +1627,157 @@ func (m Model) getUnreadStyle() lipgloss.Style {
 	return lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("2"))
 }
 
+// buildFeedDisplayList creates a flat list of folders and feeds for display
+func (m *Model) buildFeedDisplayList(feeds []database.GetFeedStatsRow) {
+	ctx := context.Background()
+
+	// Group feeds by folders
+	feedsByFolder := make(map[string][]database.GetFeedStatsRow)
+	feedsWithoutFolders := []database.GetFeedStatsRow{}
+
+	for _, feed := range feeds {
+		// Get folders for this feed
+		folders, err := m.queries.GetFeedFolders(ctx, feed.ID)
+		if err != nil || len(folders) == 0 {
+			// Feed has no folders
+			feedsWithoutFolders = append(feedsWithoutFolders, feed)
+		} else {
+			// Add feed to each of its folders
+			for _, folder := range folders {
+				feedsByFolder[folder] = append(feedsByFolder[folder], feed)
+			}
+		}
+	}
+
+	// Calculate folder stats
+	m.folderStats = make(map[string]struct{ UnreadItems, TotalItems int64 })
+	for folderName, folderFeeds := range feedsByFolder {
+		var unread, total int64
+		for _, feed := range folderFeeds {
+			unread += feed.UnreadItems
+			total += feed.TotalItems
+		}
+		m.folderStats[folderName] = struct{ UnreadItems, TotalItems int64 }{unread, total}
+	}
+
+	// Build display list
+	m.feedList = []FeedListItem{}
+
+	// If UnreadOnTop is enabled, show unread feeds without folders first
+	if m.config.UnreadOnTop {
+		// Add unread feeds without folders first
+		for _, feed := range feedsWithoutFolders {
+			if feed.UnreadItems > 0 {
+				feedCopy := feed
+				m.feedList = append(m.feedList, FeedListItem{
+					IsFolder:    false,
+					Feed:        &feedCopy,
+					UnreadItems: feed.UnreadItems,
+					TotalItems:  feed.TotalItems,
+				})
+			}
+		}
+	}
+
+	// Get sorted folder names
+	folderNames := make([]string, 0, len(feedsByFolder))
+	for name := range feedsByFolder {
+		folderNames = append(folderNames, name)
+	}
+	sort.Strings(folderNames)
+
+	// Add folders (always visible)
+	for _, folderName := range folderNames {
+		stats := m.folderStats[folderName]
+		item := FeedListItem{
+			IsFolder:    true,
+			FolderName:  folderName,
+			UnreadItems: stats.UnreadItems,
+			TotalItems:  stats.TotalItems,
+			IsExpanded:  m.expandedFolders[folderName],
+		}
+		m.feedList = append(m.feedList, item)
+
+		// If folder is expanded, add its feeds
+		if m.expandedFolders[folderName] {
+			folderFeeds := feedsByFolder[folderName]
+
+			// Sort feeds in folder by unread status if UnreadOnTop is enabled
+			if m.config.UnreadOnTop {
+				// Separate unread and read feeds
+				var unreadFeeds, readFeeds []database.GetFeedStatsRow
+				for _, feed := range folderFeeds {
+					if feed.UnreadItems > 0 {
+						unreadFeeds = append(unreadFeeds, feed)
+					} else {
+						readFeeds = append(readFeeds, feed)
+					}
+				}
+				// Add unread feeds first, then read feeds
+				for _, feed := range unreadFeeds {
+					feedCopy := feed
+					m.feedList = append(m.feedList, FeedListItem{
+						IsFolder:      false,
+						Feed:          &feedCopy,
+						UnreadItems:   feed.UnreadItems,
+						TotalItems:    feed.TotalItems,
+						IsUnderFolder: true,
+					})
+				}
+				for _, feed := range readFeeds {
+					feedCopy := feed
+					m.feedList = append(m.feedList, FeedListItem{
+						IsFolder:      false,
+						Feed:          &feedCopy,
+						UnreadItems:   feed.UnreadItems,
+						TotalItems:    feed.TotalItems,
+						IsUnderFolder: true,
+					})
+				}
+			} else {
+				// No sorting, add feeds in original order
+				for _, feed := range folderFeeds {
+					feedCopy := feed
+					m.feedList = append(m.feedList, FeedListItem{
+						IsFolder:      false,
+						Feed:          &feedCopy,
+						UnreadItems:   feed.UnreadItems,
+						TotalItems:    feed.TotalItems,
+						IsUnderFolder: true,
+					})
+				}
+			}
+		}
+	}
+
+	// Add feeds without folders (or read feeds if UnreadOnTop is enabled)
+	if m.config.UnreadOnTop {
+		// Only add read feeds (unread were added at the top)
+		for _, feed := range feedsWithoutFolders {
+			if feed.UnreadItems == 0 {
+				feedCopy := feed
+				m.feedList = append(m.feedList, FeedListItem{
+					IsFolder:    false,
+					Feed:        &feedCopy,
+					UnreadItems: feed.UnreadItems,
+					TotalItems:  feed.TotalItems,
+				})
+			}
+		}
+	} else {
+		// Add all feeds without folders
+		for _, feed := range feedsWithoutFolders {
+			feedCopy := feed
+			m.feedList = append(m.feedList, FeedListItem{
+				IsFolder:    false,
+				Feed:        &feedCopy,
+				UnreadItems: feed.UnreadItems,
+				TotalItems:  feed.TotalItems,
+			})
+		}
+	}
+}
+
 func (m Model) renderFeedList() string {
 	var b strings.Builder
 	b.WriteString(m.getTitleStyle().Render("🐐 NewsGoat " + version.GetVersion() + " - RSS Reader"))
@@ -1599,63 +1915,100 @@ func (m Model) renderFeedList() string {
 		}
 	}
 
-	// Render visible feeds
+	// Render visible items (folders and feeds)
 	feedLines := 0
 	for i := start; i < end; i++ {
-		feed := m.feedList[i]
+		item := m.feedList[i]
+		var line string
 
-		// Status emoji: error emoji if error (but not when refreshing), unread if has unread items, nothing if all read
-		var statusEmoji string
-		// Don't show error emoji when actively refreshing - let the spinner show instead
-		if feed.LastError.Valid && feed.LastError.String != "" && !m.refreshingFeeds[feed.ID] {
-			// Try to determine error type from error message
-			errorMsg := feed.LastError.String
-			if strings.Contains(errorMsg, "404") {
-				statusEmoji = "🔍" // Not found
-			} else if strings.Contains(errorMsg, "403") {
-				statusEmoji = "🚫" // Forbidden
-			} else if strings.Contains(errorMsg, "429") {
-				statusEmoji = "⏱️" // Too many requests
-			} else if strings.Contains(errorMsg, "500") || strings.Contains(errorMsg, "502") || strings.Contains(errorMsg, "503") {
-				statusEmoji = "⚠️" // Server error
-			} else if strings.Contains(errorMsg, "timeout") || strings.Contains(errorMsg, "context deadline exceeded") {
-				statusEmoji = "⌛" // Timeout
+		if item.IsFolder {
+			// Render folder
+			// Use different icon for open/closed folders
+			var folderIcon string
+			if item.IsExpanded {
+				folderIcon = "📂" // Open folder
 			} else {
-				statusEmoji = "❌" // Generic error
+				folderIcon = "📁" // Closed folder
 			}
-		} else if feed.UnreadItems > 0 {
-			statusEmoji = "🔵" // Unread items
-		} else {
-			statusEmoji = "  " // All read - two spaces to align with emoji width
-		}
+			countStr := fmt.Sprintf("(%d/%d)", item.UnreadItems, item.TotalItems)
+			paddedCount := fmt.Sprintf("%9s", countStr)
+			// Add 2 spaces after emoji to align with feed items (which have statusEmoji + 2-char spinner)
+			line = folderIcon + "  " + paddedCount + " " + item.FolderName
 
-		// Spinner - 2 character space reserved for spinner when refreshing
-		var spinner string
-		if m.refreshingFeeds[feed.ID] {
-			spinnerFrames := themes.GetSpinnerFrames(m.config.SpinnerType)
-			spinner = spinnerFrames[m.spinnerFrame%len(spinnerFrames)] + " "
-		} else {
-			spinner = "  " // Two spaces when not spinning
-		}
-
-		// Count string right-justified to 9 characters
-		countStr := fmt.Sprintf("(%d/%d)", feed.UnreadItems, feed.TotalItems)
-		paddedCount := fmt.Sprintf("%9s", countStr)
-
-		// Get display title - override for GitHub and GitLab feeds
-		displayTitle := getDisplayTitle(feed)
-
-		// Construct the line: status (emoji or 2 spaces) + spinner (2 chars) + count (9 chars) + space + feed title
-		line := statusEmoji + spinner + paddedCount + " " + displayTitle
-
-		// Apply highlighting
-		if i == m.cursor {
-			line = m.applyHighlight(line, true)
-		} else {
-			if feed.UnreadItems > 0 {
-				line = m.getUnreadStyle().Render(line)
+			// Apply highlighting
+			if i == m.cursor {
+				line = m.applyHighlight(line, true)
+			} else {
+				if item.UnreadItems > 0 {
+					line = m.getUnreadStyle().Render(line)
+				}
+				line = m.applyHighlight(line, false)
 			}
-			line = m.applyHighlight(line, false)
+		} else {
+			// Render feed
+			feed := *item.Feed
+
+			// Status emoji: error emoji if error (but not when refreshing), unread if has unread items, nothing if all read
+			var statusEmoji string
+			// Don't show error emoji when actively refreshing - let the spinner show instead
+			if feed.LastError.Valid && feed.LastError.String != "" && !m.refreshingFeeds[feed.ID] {
+				// Try to determine error type from error message
+				errorMsg := feed.LastError.String
+				if strings.Contains(errorMsg, "404") {
+					statusEmoji = "🔍" // Not found
+				} else if strings.Contains(errorMsg, "403") {
+					statusEmoji = "🚫" // Forbidden
+				} else if strings.Contains(errorMsg, "429") {
+					statusEmoji = "⏱️" // Too many requests
+				} else if strings.Contains(errorMsg, "500") || strings.Contains(errorMsg, "502") || strings.Contains(errorMsg, "503") {
+					statusEmoji = "⚠️" // Server error
+				} else if strings.Contains(errorMsg, "timeout") || strings.Contains(errorMsg, "context deadline exceeded") {
+					statusEmoji = "⌛" // Timeout
+				} else {
+					statusEmoji = "❌" // Generic error
+				}
+			} else if feed.UnreadItems > 0 {
+				statusEmoji = "🔵" // Unread items
+			} else {
+				statusEmoji = "  " // All read - two spaces to align with emoji width
+			}
+
+			// Spinner - 2 character space reserved for spinner when refreshing
+			var spinner string
+			if m.refreshingFeeds[feed.ID] {
+				spinnerFrames := themes.GetSpinnerFrames(m.config.SpinnerType)
+				spinner = spinnerFrames[m.spinnerFrame%len(spinnerFrames)] + " "
+			} else {
+				spinner = "  " // Two spaces when not spinning
+			}
+
+			// Count string right-justified to 9 characters
+			countStr := fmt.Sprintf("(%d/%d)", feed.UnreadItems, feed.TotalItems)
+			paddedCount := fmt.Sprintf("%9s", countStr)
+
+			// Get display title - override for GitHub and GitLab feeds
+			displayTitle := getDisplayTitle(feed)
+
+			// Add vertical bar prefix if this feed is under a folder
+			var prefix string
+			if item.IsUnderFolder {
+				prefix = "│ "
+			} else {
+				prefix = ""
+			}
+
+			// Construct the line: prefix + status (emoji or 2 spaces) + spinner (2 chars) + count (9 chars) + space + feed title
+			line = prefix + statusEmoji + spinner + paddedCount + " " + displayTitle
+
+			// Apply highlighting
+			if i == m.cursor {
+				line = m.applyHighlight(line, true)
+			} else {
+				if feed.UnreadItems > 0 {
+					line = m.getUnreadStyle().Render(line)
+				}
+				line = m.applyHighlight(line, false)
+			}
 		}
 
 		b.WriteString(line)
@@ -1714,7 +2067,7 @@ func (m Model) renderFeedList() string {
 		b.WriteString(messageStyle.Render(m.statusMessage))
 	} else if m.addingURL {
 		// Show URL input modal
-		urlPrompt := "Add URL: " + m.urlInput
+		urlPrompt := "Add URL [folders]: " + m.urlInput
 		b.WriteString(m.getHelpStyle().Render(urlPrompt))
 	} else if m.searchMode {
 		searchPrompt := "/" + m.searchQuery
@@ -3504,7 +3857,13 @@ func (m Model) renderURLsView() string {
 	if len(m.urlsList) == 0 {
 		allLines = append(allLines, "No URLs found.")
 	} else {
-		allLines = append(allLines, m.urlsList...)
+		for _, entry := range m.urlsList {
+			line := entry.URL
+			if len(entry.Folders) > 0 {
+				line += " " + strings.Join(entry.Folders, ",")
+			}
+			allLines = append(allLines, line)
+		}
 	}
 
 	// Calculate available height for content (height - title - status bar)

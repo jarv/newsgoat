@@ -158,3 +158,27 @@ SELECT key, value, updated_at FROM settings ORDER BY key;
 
 -- name: DeleteSetting :exec
 DELETE FROM settings WHERE key = ?;
+
+-- name: AddFeedFolder :exec
+INSERT INTO feed_folders (feed_id, folder_name)
+VALUES (?, ?)
+ON CONFLICT(feed_id, folder_name) DO NOTHING;
+
+-- name: GetFeedFolders :many
+SELECT folder_name FROM feed_folders WHERE feed_id = ? ORDER BY folder_name;
+
+-- name: DeleteFeedFolders :exec
+DELETE FROM feed_folders WHERE feed_id = ?;
+
+-- name: GetFolderStats :many
+SELECT
+    ff.folder_name,
+    COUNT(DISTINCT i.id) as total_items,
+    COUNT(DISTINCT CASE WHEN i.id IS NOT NULL AND COALESCE(rs.read, FALSE) = FALSE THEN i.id END) as unread_items
+FROM feed_folders ff
+INNER JOIN feeds f ON ff.feed_id = f.id
+LEFT JOIN items i ON f.id = i.feed_id
+LEFT JOIN read_status rs ON i.id = rs.item_id
+WHERE f.visible = TRUE
+GROUP BY ff.folder_name
+ORDER BY ff.folder_name;

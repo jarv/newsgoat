@@ -18,12 +18,13 @@ Meanwhile, “vibe coding” was catching on, and it seemed like a fun excuse to
 
 ## Features
 
-- Feeds are grouped by the feed URL.
-- Quickly query info for every feed including cache-control, last-updated, etc. Press <kbd>i</kbd> to view feed info.
-- Error logs are shown directly in the UI for feed troubleshooting. Press <kbd>l</kbd> to view logs.
-- Refresh task control separate in the app with a way to see what is queued, running and failures. Press <kbd>t</kbd> to view tasks.
-- Option to put feeds with unread items at the top. Press <kbd>c</kbd> to configure.
-- Automatic feed discovery when adding URLs. Press <kbd>u</kbd> to add a youtube link and automatically subscribe to the channel's feed.
+- **Folder organization**: Organize feeds into collapsible folders. Feeds can belong to multiple folders.
+- **Feed grouping**: Feeds are grouped by the feed URL.
+- **Feed info**: Quickly query info for every feed including cache-control, last-updated, etc. Press <kbd>i</kbd> to view feed info.
+- **Error logs**: Error logs are shown directly in the UI for feed troubleshooting. Press <kbd>l</kbd> to view logs.
+- **Task management**: Refresh task control separate in the app with a way to see what is queued, running and failures. Press <kbd>t</kbd> to view tasks.
+- **Flexible sorting**: Option to put feeds with unread items at the top. Press <kbd>c</kbd> to configure.
+- **Auto-discovery**: Automatic feed discovery when adding URLs. Press <kbd>u</kbd> to add a youtube link and automatically subscribe to the channel's feed.
 
 ## Feed Auto Discovery
 
@@ -152,9 +153,15 @@ NewsGoat will automatically discover the RSS/Atom feed URL from the provided URL
 
 Press `u` in the feed list view to open an interactive prompt where you can:
 
-- Type or paste a URL
+- Type or paste a URL (optionally followed by folders)
+- Format: `<url>` or `<url> folder1,folder2` or `<url> "folder with spaces",folder3`
 - Press Enter to add (with automatic feed discovery)
 - Press Esc to cancel
+
+Examples:
+- `https://example.com Tech News`
+- `https://youtube.com/@channel Tech News,YouTube`
+- `https://example.com "My Folder",Tech`
 
 ### 3. Edit the URLs File Directly
 
@@ -164,19 +171,46 @@ Alternatively, edit the file manually:
 
 - Create/edit `~/.config/newsgoat/urls`
 - Add one feed URL per line
+- Optionally add folders after the URL: `<url> folder1,folder2`
+- Use quotes for folder names with spaces: `<url> "folder name",otherfolder`
 - Lines starting with `#` are treated as comments
 - Save and press `Ctrl+R` in NewsGoat to reload
 
 Example `urls` file:
 
 ```text
-# Tech News
-https://feeds.feedburner.com/techcrunch
-https://rss.cnn.com/rss/edition.rss
+# Feeds can have folders! Format: <url> folder1,folder2
+# Use quotes for folder names with spaces: <url> "folder name",otherfolder
 
-# YouTube Channels
-https://www.youtube.com/@channel
+# Tech News
+https://www.theverge.com/rss/index.xml Tech News
+https://feeds.feedburner.com/TechCrunch/ Tech News,Startups
+https://www.wired.com/feed/rss Tech News
+
+# Science feeds
+https://www.sciencedaily.com/rss/top/science.xml Science
+https://www.nasa.gov/rss/dyn/breaking_news.rss Science,Space
+
+# Feeds with spaces in folder names
+https://www.popularmechanics.com/rss/all.xml/ "DIY & Tech"
+
+# Feeds without folders
+https://example.com/feed
 ```
+
+## Organizing Feeds with Folders
+
+NewsGoat supports organizing feeds into folders:
+
+- **Multiple folders**: Feeds can belong to multiple folders and will appear under each one
+- **Collapsible**: Press Enter on a folder to expand/collapse its contents
+- **Visual hierarchy**: Feeds under folders are displayed with a vertical bar (`│`) for easy identification
+- **Folder operations**:
+  - Press `r` on a folder to refresh all feeds in that folder
+  - Press `A` on a folder to mark all items in that folder as read
+- **Sorting**: When "Unread on Top" is enabled:
+  - Unread feeds without folders appear at the very top
+  - Within folders, unread feeds appear before read feeds
 
 ## Keys
 
@@ -198,12 +232,13 @@ https://www.youtube.com/@channel
 
 | Key | Description |
 |-----|-------------|
-| <kbd>r</kbd> | Refresh selected feed |
+| <kbd>Enter</kbd> | Open feed / expand or collapse folder |
+| <kbd>r</kbd> | Refresh selected feed or all feeds in folder |
 | <kbd>R</kbd> | Refresh all feeds |
-| <kbd>A</kbd> | Mark all items in feed as read |
+| <kbd>A</kbd> | Mark all items in feed/folder as read |
 | <kbd>i</kbd> | Show feed info (cache-control, last-updated, etc.) |
-| <kbd>/</kbd> | Search feeds |
-| <kbd>u</kbd> | Add URL (with automatic feed discovery) |
+| <kbd>/</kbd> | Search feeds and folders |
+| <kbd>u</kbd> | Add URL with optional folders (e.g., `url folder1,folder2`) |
 | <kbd>U</kbd> | Edit URLs file in $EDITOR |
 | <kbd>Ctrl</kbd>+<kbd>R</kbd> | Reload URLs from file |
 | <kbd>l</kbd> | View logs |
@@ -259,6 +294,8 @@ https://www.youtube.com/@channel
 
 | Icon | Meaning |
 |------|---------|
+| 📁 | Closed folder |
+| 📂 | Open folder |
 | 🔵 | Unread items/feed |
 | 🔍 | 404 Not Found |
 | 🚫 | 403 Forbidden |
@@ -269,3 +306,4 @@ https://www.youtube.com/@channel
 | 🕓 | Pending task |
 | 🔄 | Running task |
 | 💥 | Failed task |
+| │ | Feed under folder (vertical bar prefix) |

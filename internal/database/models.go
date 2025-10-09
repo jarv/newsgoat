@@ -23,6 +23,12 @@ type Feed struct {
 	CacheControlMaxAge sql.NullInt64  `json:"cache_control_max_age"`
 }
 
+type FeedFolder struct {
+	ID         int64  `json:"id"`
+	FeedID     int64  `json:"feed_id"`
+	FolderName string `json:"folder_name"`
+}
+
 type Item struct {
 	ID          int64        `json:"id"`
 	FeedID      int64        `json:"feed_id"`
