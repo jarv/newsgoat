@@ -1,3 +1,10 @@
+## [1.8.1](https://github.com/jarv/newsgoat/compare/v1.8.0...v1.8.1) (2025-10-09)
+
+
+### Bug Fixes
+
+* Resolves golangci-lint errors and updates go version ([842b0e4](https://github.com/jarv/newsgoat/commit/842b0e410ee67a83d9a258ccaff55742d20fdc9c))
+
 # [1.8.0](https://github.com/jarv/newsgoat/compare/v1.7.3...v1.8.0) (2025-10-09)
 
 
