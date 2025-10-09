@@ -1,3 +1,10 @@
+## [1.8.2](https://github.com/jarv/newsgoat/compare/v1.8.1...v1.8.2) (2025-10-09)
+
+
+### Bug Fixes
+
+* Fixes broken RSS 1.0 feed parsing ([a502a7d](https://github.com/jarv/newsgoat/commit/a502a7d03e9bc5e202f6bbaf18925c41b349b7a3))
+
 ## [1.8.1](https://github.com/jarv/newsgoat/compare/v1.8.0...v1.8.1) (2025-10-09)
 
 
