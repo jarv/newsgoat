@@ -119,6 +119,11 @@ func run(urlFile string, debug bool) error {
 		return fmt.Errorf("failed to initialize database: %w", err)
 	}
 
+	// Run migrations
+	if err := RunMigrations(db); err != nil {
+		return fmt.Errorf("failed to run migrations: %w", err)
+	}
+
 	// Load configuration from database
 	cfg, err := config.LoadConfig(queries)
 	if err != nil {

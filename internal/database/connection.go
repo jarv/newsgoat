@@ -52,6 +52,7 @@ func InitDBWithSchema(schemaSQL string) (*sql.DB, *Queries, error) {
 	// db.SetMaxIdleConns(2)    // Keep some idle connections
 	// db.SetConnMaxLifetime(0) // No limit
 
+	// Keep the old schema creation for backward compatibility if needed
 	if schemaSQL != "" {
 		if err := createTables(db, schemaSQL); err != nil {
 			_ = db.Close()
@@ -67,4 +68,3 @@ func createTables(db *sql.DB, schemaSQL string) error {
 	_, err := db.Exec(schemaSQL)
 	return err
 }
-
