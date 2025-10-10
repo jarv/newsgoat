@@ -1,19 +1,21 @@
 # Feeds can now have folders! Format: <url> folder1,folder2
 # Use quotes for folder names with spaces: <url> "folder name",otherfolder
 
-https://www.theverge.com/rss/index.xml Tech News
-https://www.engadget.com/rss.xml Tech News
-https://arstechnica.com/feed/ Tech News
-https://feeds.feedburner.com/TechCrunch/ Tech News,Startups
-https://www.wired.com/feed/rss Tech News
-https://thenextweb.com/feed/ Tech News
-https://www.cnet.com/rss/news/ Tech News
+https://github.com/jarv/newsgoat/commits/main/go.mod.atom GitHub
+https://gitlab.com/graphviz/graphviz/-/commits/main/CHANGELOG.md?format=atom GitLab
+https://www.theverge.com/rss/index.xml "Tech News"
+https://www.engadget.com/rss.xml "Tech News"
+https://arstechnica.com/feed/ "Tech News"
+https://feeds.feedburner.com/TechCrunch/ "Tech News"
+https://www.wired.com/feed/rss "Tech News"
+https://thenextweb.com/feed/ "Tech News"
+https://www.cnet.com/rss/news/ "Tech News"
 https://www.sciencedaily.com/rss/top/science.xml Science
-https://www.nature.com/subjects/technology.rss Science,Tech News
-https://www.newscientist.com/feed/home/ Science
-https://www.livescience.com/feeds/all Science
-https://www.nasa.gov/rss/dyn/breaking_news.rss Science,Space
-https://www.space.com/feeds/all Space
-https://www.popularmechanics.com/rss/all.xml/ "DIY & Tech"
-https://www.howtogeek.com/feed/ Tutorials
-https://www.makeuseof.com/feed/ Tutorials
+https://www.nature.com/subjects/technology.rss Science,"Tech News"
+https://www.newscientist.com/feed/home/
+https://www.livescience.com/feeds/all
+https://www.nasa.gov/rss/dyn/breaking_news.rss
+https://www.space.com/feeds/all
+https://www.popularmechanics.com/rss/all.xml/
+https://www.howtogeek.com/feed/
+https://www.makeuseof.com/feed/
