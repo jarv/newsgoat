@@ -13,6 +13,13 @@ type URLEntry struct {
 	Folders []string
 }
 
+// Line represents a line in the URLs file (either a URL entry or a comment/blank line)
+type Line struct {
+	Entry   *URLEntry
+	Raw     string // For comments and blank lines
+	IsEntry bool
+}
+
 // GetEditor returns the editor to use from the EDITOR environment variable
 func GetEditor() string {
 	return os.Getenv("EDITOR")
@@ -91,10 +98,27 @@ func parseFolders(folderStr string) []string {
 }
 
 func ReadURLsFileFromPath(urlsPath string) ([]URLEntry, error) {
+	lines, err := ReadAllLinesFromPath(urlsPath)
+	if err != nil {
+		return nil, err
+	}
+
+	var entries []URLEntry
+	for _, line := range lines {
+		if line.IsEntry {
+			entries = append(entries, *line.Entry)
+		}
+	}
+
+	return entries, nil
+}
+
+// ReadAllLinesFromPath reads all lines from the URLs file, preserving comments and blank lines
+func ReadAllLinesFromPath(urlsPath string) ([]Line, error) {
 	file, err := os.Open(urlsPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return []URLEntry{}, nil
+			return []Line{}, nil
 		}
 		return nil, err
 	}
@@ -102,17 +126,28 @@ func ReadURLsFileFromPath(urlsPath string) ([]URLEntry, error) {
 		_ = file.Close()
 	}()
 
-	var entries []URLEntry
+	var lines []Line
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" || strings.HasPrefix(line, "#") {
+		rawLine := scanner.Text()
+		trimmedLine := strings.TrimSpace(rawLine)
+
+		// Check if it's a comment or blank line
+		if trimmedLine == "" || strings.HasPrefix(trimmedLine, "#") {
+			lines = append(lines, Line{
+				Raw:     rawLine,
+				IsEntry: false,
+			})
 			continue
 		}
 
 		// Split on first whitespace to separate URL from folders
-		parts := strings.Fields(line)
+		parts := strings.Fields(trimmedLine)
 		if len(parts) == 0 {
+			lines = append(lines, Line{
+				Raw:     rawLine,
+				IsEntry: false,
+			})
 			continue
 		}
 
@@ -127,10 +162,13 @@ func ReadURLsFileFromPath(urlsPath string) ([]URLEntry, error) {
 			entry.Folders = parseFolders(folderStr)
 		}
 
-		entries = append(entries, entry)
+		lines = append(lines, Line{
+			Entry:   &entry,
+			IsEntry: true,
+		})
 	}
 
-	return entries, scanner.Err()
+	return lines, scanner.Err()
 }
 
 func WriteURLsFile(urls []string) error {
@@ -162,87 +200,134 @@ func WriteURLsFile(urls []string) error {
 	return writer.Flush()
 }
 
+// WriteAllLines writes all lines back to the URLs file, preserving comments and blank lines
+func WriteAllLines(urlsPath string, lines []Line) error {
+	dir := filepath.Dir(urlsPath)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return err
+	}
+
+	file, err := os.Create(urlsPath)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_ = file.Close()
+	}()
+
+	writer := bufio.NewWriter(file)
+	for _, line := range lines {
+		var output string
+		if line.IsEntry {
+			output = line.Entry.URL
+			if len(line.Entry.Folders) > 0 {
+				output += " " + strings.Join(line.Entry.Folders, ",")
+			}
+		} else {
+			output = line.Raw
+		}
+		if _, err := writer.WriteString(output + "\n"); err != nil {
+			return err
+		}
+	}
+
+	return writer.Flush()
+}
+
 func AddURL(url string) error {
-	entries, err := ReadURLsFile()
+	urlsPath, err := GetURLsFilePath()
+	if err != nil {
+		return err
+	}
+
+	lines, err := ReadAllLinesFromPath(urlsPath)
 	if err != nil {
 		return err
 	}
 
 	// Check if URL already exists
-	for _, entry := range entries {
-		if entry.URL == url {
+	for _, line := range lines {
+		if line.IsEntry && line.Entry.URL == url {
 			return nil
 		}
 	}
 
-	// Convert entries back to strings for writing
-	urls := make([]string, len(entries)+1)
-	for i, entry := range entries {
-		if len(entry.Folders) > 0 {
-			urls[i] = entry.URL + " " + strings.Join(entry.Folders, ",")
-		} else {
-			urls[i] = entry.URL
-		}
-	}
-	urls[len(urls)-1] = url
+	// Add the new URL as a line
+	lines = append(lines, Line{
+		Entry: &URLEntry{
+			URL: url,
+		},
+		IsEntry: true,
+	})
 
-	return WriteURLsFile(urls)
+	return WriteAllLines(urlsPath, lines)
 }
 
 // AddURLLine adds a complete URL line (including folders) to the URLs file
-func AddURLLine(line string) error {
-	entries, err := ReadURLsFile()
+func AddURLLine(lineStr string) error {
+	urlsPath, err := GetURLsFilePath()
+	if err != nil {
+		return err
+	}
+
+	lines, err := ReadAllLinesFromPath(urlsPath)
 	if err != nil {
 		return err
 	}
 
 	// Parse the line to get the URL
-	parts := strings.Fields(line)
+	parts := strings.Fields(lineStr)
 	if len(parts) == 0 {
 		return nil
 	}
 	newURL := parts[0]
 
 	// Check if URL already exists
-	for _, entry := range entries {
-		if entry.URL == newURL {
+	for _, line := range lines {
+		if line.IsEntry && line.Entry.URL == newURL {
 			return nil
 		}
 	}
 
-	// Convert entries back to strings for writing
-	urls := make([]string, len(entries)+1)
-	for i, entry := range entries {
-		if len(entry.Folders) > 0 {
-			urls[i] = entry.URL + " " + strings.Join(entry.Folders, ",")
-		} else {
-			urls[i] = entry.URL
-		}
+	// Parse the new entry
+	entry := URLEntry{
+		URL: newURL,
 	}
-	urls[len(urls)-1] = line
+	if len(parts) > 1 {
+		folderStr := strings.Join(parts[1:], " ")
+		entry.Folders = parseFolders(folderStr)
+	}
 
-	return WriteURLsFile(urls)
+	// Add the new line
+	lines = append(lines, Line{
+		Entry:   &entry,
+		IsEntry: true,
+	})
+
+	return WriteAllLines(urlsPath, lines)
 }
 
 func RemoveURL(url string) error {
-	entries, err := ReadURLsFile()
+	urlsPath, err := GetURLsFilePath()
+	if err != nil {
+		return err
+	}
+
+	lines, err := ReadAllLinesFromPath(urlsPath)
 	if err != nil {
 		return err
 	}
 
 	// Filter out the URL to remove
-	var newURLs []string
-	for _, entry := range entries {
-		if entry.URL != url {
-			if len(entry.Folders) > 0 {
-				newURLs = append(newURLs, entry.URL+" "+strings.Join(entry.Folders, ","))
-			} else {
-				newURLs = append(newURLs, entry.URL)
-			}
+	var newLines []Line
+	for _, line := range lines {
+		if line.IsEntry && line.Entry.URL == url {
+			continue
 		}
+		newLines = append(newLines, line)
 	}
 
-	return WriteURLsFile(newURLs)
+	return WriteAllLines(urlsPath, newLines)
 }
 
 func CreateSampleURLsFile() error {
