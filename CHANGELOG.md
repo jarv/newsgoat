@@ -1,3 +1,15 @@
+# [1.9.0](https://github.com/jarv/newsgoat/compare/v1.8.2...v1.9.0) (2025-10-15)
+
+
+### Bug Fixes
+
+* Preserve comments in urls file when adding individual URLs ([58bcb61](https://github.com/jarv/newsgoat/commit/58bcb6195bd543bd8411ba29ef286998c5d43129))
+
+
+### Features
+
+* Improve feed search ([b1a4dd4](https://github.com/jarv/newsgoat/commit/b1a4dd43667e2736f35e49d4e0d45853d27a2a53))
+
 ## [1.8.2](https://github.com/jarv/newsgoat/compare/v1.8.1...v1.8.2) (2025-10-09)
 
 
