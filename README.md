@@ -159,6 +159,7 @@ Press `u` in the feed list view to open an interactive prompt where you can:
 - Press Esc to cancel
 
 Examples:
+
 - `https://example.com Tech News`
 - `https://youtube.com/@channel Tech News,YouTube`
 - `https://example.com "My Folder",Tech`
@@ -212,6 +213,30 @@ NewsGoat supports organizing feeds into folders:
   - Unread feeds without folders appear at the very top
   - Within folders, unread feeds appear before read feeds
 
+## Searching Feeds and Articles
+
+NewsGoat provides two search modes with case-insensitive text matching:
+
+### Search Modes
+
+- **Global Search** (<kbd>/</kbd>): Searches across multiple fields
+  - **Feed List View**: Searches all feed content
+  - **Item List View**: Searches all feed content across feed items
+
+- **Title Search** (<kbd>Ctrl</kbd>+<kbd>F</kbd>): Searches only titles
+  - **Feed List View**: Searches feed titles only
+  - **Item List View**: Searches item titles only
+
+### Using Search
+
+1. Press <kbd>/</kbd> or <kbd>Ctrl</kbd>+<kbd>F</kbd> to start searching
+2. Type your search query (case-insensitive text matching)
+3. Switch between modes anytime by pressing <kbd>/</kbd> or <kbd>Ctrl</kbd>+<kbd>F</kbd>
+4. Press <kbd>Enter</kbd> to exit search mode and keep results
+5. Press <kbd>Esc</kbd> to cancel and restore original view
+
+Search filters results in real-time as you type, making it easy to find specific feeds or articles quickly.
+
 ## Keys
 
 ### Global (Available in All Views)
@@ -237,7 +262,8 @@ NewsGoat supports organizing feeds into folders:
 | <kbd>R</kbd> | Refresh all feeds |
 | <kbd>A</kbd> | Mark all items in feed/folder as read |
 | <kbd>i</kbd> | Show feed info (cache-control, last-updated, etc.) |
-| <kbd>/</kbd> | Search feeds and folders |
+| <kbd>/</kbd> | Global search (all feed content) |
+| <kbd>Ctrl</kbd>+<kbd>F</kbd> | Title search only |
 | <kbd>u</kbd> | Add URL with optional folders (e.g., `url folder1,folder2`) |
 | <kbd>U</kbd> | Edit URLs file in $EDITOR |
 | <kbd>Ctrl</kbd>+<kbd>R</kbd> | Reload URLs from file |
@@ -249,6 +275,8 @@ NewsGoat supports organizing feeds into folders:
 
 | Key | Description |
 |-----|-------------|
+| <kbd>/</kbd> | Global search (all feed content) |
+| <kbd>Ctrl</kbd>+<kbd>F</kbd> | Title search only |
 | <kbd>r</kbd> | Refresh current feed |
 | <kbd>R</kbd> | Refresh all feeds |
 | <kbd>A</kbd> | Mark all items as read |

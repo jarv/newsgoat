@@ -458,6 +458,50 @@ func (m *Manager) GetItemsWithReadStatus(feedID int64) ([]database.GetItemsWithR
 	return result, err
 }
 
+func (m *Manager) SearchFeedsByTitle(pattern string) ([]database.SearchFeedsByTitleRow, error) {
+	m.dbMutex.RLock()
+	result, err := m.queries.SearchFeedsByTitle(context.Background(), sql.NullString{String: pattern, Valid: true})
+	m.dbMutex.RUnlock()
+	return result, err
+}
+
+func (m *Manager) SearchFeedsGlobally(pattern string) ([]database.SearchFeedsGloballyRow, error) {
+	m.dbMutex.RLock()
+	nullPattern := sql.NullString{String: pattern, Valid: true}
+	result, err := m.queries.SearchFeedsGlobally(context.Background(), database.SearchFeedsGloballyParams{
+		Column1: nullPattern,
+		Column2: nullPattern,
+		Column3: nullPattern,
+		Column4: nullPattern,
+		Column5: nullPattern,
+	})
+	m.dbMutex.RUnlock()
+	return result, err
+}
+
+func (m *Manager) SearchItemsByTitle(feedID int64, pattern string) ([]database.SearchItemsByTitleRow, error) {
+	m.dbMutex.RLock()
+	result, err := m.queries.SearchItemsByTitle(context.Background(), database.SearchItemsByTitleParams{
+		FeedID:  feedID,
+		Column2: sql.NullString{String: pattern, Valid: true},
+	})
+	m.dbMutex.RUnlock()
+	return result, err
+}
+
+func (m *Manager) SearchItemsGlobally(feedID int64, pattern string) ([]database.SearchItemsGloballyRow, error) {
+	m.dbMutex.RLock()
+	nullPattern := sql.NullString{String: pattern, Valid: true}
+	result, err := m.queries.SearchItemsGlobally(context.Background(), database.SearchItemsGloballyParams{
+		FeedID:  feedID,
+		Column2: nullPattern,
+		Column3: nullPattern,
+		Column4: nullPattern,
+	})
+	m.dbMutex.RUnlock()
+	return result, err
+}
+
 func (m *Manager) MarkItemRead(itemID int64) error {
 	m.dbMutex.Lock()
 	defer m.dbMutex.Unlock()

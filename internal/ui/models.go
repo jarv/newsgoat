@@ -100,12 +100,12 @@ func wrapText(text string, width int) []string {
 
 // FeedListItem represents an item in the feed list (either a folder or a feed)
 type FeedListItem struct {
-	IsFolder     bool
-	FolderName   string
-	Feed         *database.GetFeedStatsRow
-	UnreadItems  int64
-	TotalItems   int64
-	IsExpanded   bool
+	IsFolder      bool
+	FolderName    string
+	Feed          *database.GetFeedStatsRow
+	UnreadItems   int64
+	TotalItems    int64
+	IsExpanded    bool
 	IsUnderFolder bool // True if this feed is displayed under a folder
 }
 
@@ -124,34 +124,6 @@ func getDisplayTitle(feed database.GetFeedStatsRow) string {
 	}
 }
 
-// filterFeedsBySearch filters the feed list based on the search query
-func (m *Model) filterFeedsBySearch() {
-	if m.searchQuery == "" {
-		// Empty search shows all feeds
-		m.feedList = m.unfilteredFeedList
-		return
-	}
-
-	// Filter items by search query (case-insensitive)
-	lowerQuery := strings.ToLower(m.searchQuery)
-	var filtered []FeedListItem
-	for _, item := range m.unfilteredFeedList {
-		if item.IsFolder {
-			// Check folder name
-			if strings.Contains(strings.ToLower(item.FolderName), lowerQuery) {
-				filtered = append(filtered, item)
-			}
-		} else {
-			// Check feed title
-			displayTitle := getDisplayTitle(*item.Feed)
-			if strings.Contains(strings.ToLower(displayTitle), lowerQuery) {
-				filtered = append(filtered, item)
-			}
-		}
-	}
-	m.feedList = filtered
-}
-
 type ViewState int
 
 const (
@@ -165,6 +137,13 @@ const (
 	HelpView
 	SettingsView
 	URLsView
+)
+
+type SearchType int
+
+const (
+	TitleSearch SearchType = iota
+	GlobalSearch
 )
 
 type Model struct {
@@ -204,44 +183,46 @@ type Model struct {
 	err                             error
 	refreshing                      bool
 	refreshStatus                   string
-	refreshingFeeds                 map[int64]bool    // Track which feeds are currently refreshing
-	pendingFeeds                    []int64           // Feeds waiting to be refreshed (for refresh-all)
-	maxConcurrency                  int            // Max concurrent refreshes allowed
-	spinnerFrame                    int            // Current spinner animation frame
-	spinnerRunning                  bool           // Track if spinner timer is already running
-	firstAutoReload                 bool           // Track if this is the first auto reload (for SuppressFirstReload)
-	pendingStartupReload            bool           // Track if we need to reload on startup after feed list loads
-	nextReloadTime                  time.Time      // Time when next auto reload is scheduled
-	editingSettings                 bool           // Track if we're editing a setting
-	selectingTheme                  bool           // Track if we're selecting a theme
-	selectingHighlight              bool           // Track if we're selecting a highlight style
-	selectingSpinner                bool           // Track if we're selecting a spinner type
-	selectingShowReadFeeds          bool           // Track if we're selecting show read feeds
-	selectingAutoReload             bool           // Track if we're selecting auto reload
-	selectingSuppressFirstReload    bool           // Track if we're selecting suppress first reload
-	selectingReloadOnStartup        bool           // Track if we're selecting reload on startup
-	selectingUnreadOnTop            bool           // Track if we're selecting unread on top
-	showRawHTML                     bool           // Track if showing raw HTML in article view
-	themeSelectCursor               int            // Cursor position in theme selector
-	highlightSelectCursor           int            // Cursor position in highlight style selector
-	spinnerSelectCursor             int            // Cursor position in spinner type selector
-	showReadFeedsSelectCursor       int            // Cursor position in show read feeds selector
-	autoReloadSelectCursor          int            // Cursor position in auto reload selector
-	suppressFirstReloadSelectCursor int            // Cursor position in suppress first reload selector
-	reloadOnStartupSelectCursor     int            // Cursor position in reload on startup selector
-	unreadOnTopSelectCursor         int            // Cursor position in unread on top selector
-	settingInput                    string         // Current input value when editing
-	showSettingsHelp                bool           // Track if we're showing settings help
-	searchMode                      bool           // Track if search mode is active
-	searchQuery                     string         // Current search query text
-	searchActive                    bool           // Track if feeds are currently filtered by search
-	unfilteredFeedList              []FeedListItem // Feed list before search filtering
-	statusMessage                   string         // Message to display above status bar
-	statusMessageType               string         // Type of message: "error" or "info"
-	quitPressed                     bool           // Track if 'q' was pressed once (for quit confirmation)
-	ctrlCPressed                    bool           // Track if 'ctrl+c' was pressed once (for quit confirmation)
-	addingURL                       bool           // Track if in URL adding mode
-	urlInput                        string         // Current URL input text
+	refreshingFeeds                 map[int64]bool                       // Track which feeds are currently refreshing
+	pendingFeeds                    []int64                              // Feeds waiting to be refreshed (for refresh-all)
+	maxConcurrency                  int                                  // Max concurrent refreshes allowed
+	spinnerFrame                    int                                  // Current spinner animation frame
+	spinnerRunning                  bool                                 // Track if spinner timer is already running
+	firstAutoReload                 bool                                 // Track if this is the first auto reload (for SuppressFirstReload)
+	pendingStartupReload            bool                                 // Track if we need to reload on startup after feed list loads
+	nextReloadTime                  time.Time                            // Time when next auto reload is scheduled
+	editingSettings                 bool                                 // Track if we're editing a setting
+	selectingTheme                  bool                                 // Track if we're selecting a theme
+	selectingHighlight              bool                                 // Track if we're selecting a highlight style
+	selectingSpinner                bool                                 // Track if we're selecting a spinner type
+	selectingShowReadFeeds          bool                                 // Track if we're selecting show read feeds
+	selectingAutoReload             bool                                 // Track if we're selecting auto reload
+	selectingSuppressFirstReload    bool                                 // Track if we're selecting suppress first reload
+	selectingReloadOnStartup        bool                                 // Track if we're selecting reload on startup
+	selectingUnreadOnTop            bool                                 // Track if we're selecting unread on top
+	showRawHTML                     bool                                 // Track if showing raw HTML in article view
+	themeSelectCursor               int                                  // Cursor position in theme selector
+	highlightSelectCursor           int                                  // Cursor position in highlight style selector
+	spinnerSelectCursor             int                                  // Cursor position in spinner type selector
+	showReadFeedsSelectCursor       int                                  // Cursor position in show read feeds selector
+	autoReloadSelectCursor          int                                  // Cursor position in auto reload selector
+	suppressFirstReloadSelectCursor int                                  // Cursor position in suppress first reload selector
+	reloadOnStartupSelectCursor     int                                  // Cursor position in reload on startup selector
+	unreadOnTopSelectCursor         int                                  // Cursor position in unread on top selector
+	settingInput                    string                               // Current input value when editing
+	showSettingsHelp                bool                                 // Track if we're showing settings help
+	searchMode                      bool                                 // Track if search mode is active
+	searchType                      SearchType                           // Type of search: TitleSearch or GlobalSearch
+	searchQuery                     string                               // Current search query text
+	searchActive                    bool                                 // Track if feeds/items are currently filtered by search
+	unfilteredFeedList              []FeedListItem                       // Feed list before search filtering (for restoring)
+	unfilteredItemList              []database.GetItemsWithReadStatusRow // Item list before search filtering (for restoring)
+	statusMessage                   string                               // Message to display above status bar
+	statusMessageType               string                               // Type of message: "error" or "info"
+	quitPressed                     bool                                 // Track if 'q' was pressed once (for quit confirmation)
+	ctrlCPressed                    bool                                 // Track if 'ctrl+c' was pressed once (for quit confirmation)
+	addingURL                       bool                                 // Track if in URL adding mode
+	urlInput                        string                               // Current URL input text
 }
 
 type RefreshMsg struct {
@@ -280,6 +261,12 @@ type FeedListLoadedMsg struct {
 
 type ItemListLoadedMsg struct {
 	Items []database.GetItemsWithReadStatusRow
+}
+
+type SearchResultsMsg struct {
+	FeedResults []database.SearchFeedsByTitleRow
+	ItemResults []database.SearchItemsByTitleRow
+	IsGlobal    bool
 }
 
 type ErrorMsg struct {
@@ -412,10 +399,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			} else if m.searchMode {
 				m.searchQuery += string(msg.Runes)
-				m.filterFeedsBySearch()
-				m.cursor = 0
-				m.savedFeedCursor = 0
-				return m, nil
+				switch m.state {
+				case FeedListView:
+					m.cursor = 0
+					m.savedFeedCursor = 0
+				case ItemListView:
+					m.cursor = 0
+					m.savedItemCursor = 0
+				}
+				return m, performSearch(m.feedManager, m.state, m.selectedFeed, m.searchType, m.searchQuery)
 			}
 		}
 		return m.handleKeyPress(msg)
@@ -485,6 +477,43 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.savedItemCursor = m.cursor
 		} else {
 			// First time entering, start at top
+			m.cursor = 0
+			m.savedItemCursor = 0
+		}
+		return m, nil
+
+	case SearchResultsMsg:
+		// Handle search results
+		if m.state == FeedListView && len(msg.FeedResults) >= 0 {
+			// Convert search results to FeedListItems
+			// Note: Search results don't have folder information, so we display them as flat list
+			m.feedList = make([]FeedListItem, len(msg.FeedResults))
+			for i, result := range msg.FeedResults {
+				m.feedList[i] = FeedListItem{
+					IsFolder: false,
+					Feed: &database.GetFeedStatsRow{
+						ID:            result.ID,
+						Title:         result.Title,
+						Url:           result.Url,
+						LastError:     result.LastError,
+						LastErrorTime: result.LastErrorTime,
+						TotalItems:    result.TotalItems,
+						UnreadItems:   result.UnreadItems,
+					},
+					UnreadItems:   result.UnreadItems,
+					TotalItems:    result.TotalItems,
+					IsExpanded:    false,
+					IsUnderFolder: false,
+				}
+			}
+			m.cursor = 0
+			m.savedFeedCursor = 0
+		} else if m.state == ItemListView && len(msg.ItemResults) >= 0 {
+			// Convert search results to item list
+			m.itemList = make([]database.GetItemsWithReadStatusRow, len(msg.ItemResults))
+			for i, result := range msg.ItemResults {
+				m.itemList[i] = database.GetItemsWithReadStatusRow(result)
+			}
 			m.cursor = 0
 			m.savedItemCursor = 0
 		}
@@ -920,50 +949,100 @@ func (m Model) handleFeedListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.searchMode {
 		switch msg.String() {
 		case "esc", "ctrl+c":
-			// Cancel search and restore original feed list
+			// Cancel search and restore original list
 			m.searchMode = false
 			m.searchActive = false
-			m.feedList = m.unfilteredFeedList
 			m.searchQuery = ""
-			m.cursor = 0
-			m.savedFeedCursor = 0
+			switch m.state {
+			case FeedListView:
+				m.feedList = m.unfilteredFeedList
+				m.cursor = 0
+				m.savedFeedCursor = 0
+			case ItemListView:
+				m.itemList = m.unfilteredItemList
+				m.cursor = 0
+				m.savedItemCursor = 0
+			}
 			return m, nil
+
+		case "/":
+			// Switch to global search mode (if not already)
+			if m.searchType != GlobalSearch {
+				m.searchType = GlobalSearch
+				// Trigger search with current query
+				return m, performSearch(m.feedManager, m.state, m.selectedFeed, m.searchType, m.searchQuery)
+			}
+			return m, nil
+
+		case "ctrl+f":
+			// Switch to title search mode (if not already)
+			if m.searchType != TitleSearch {
+				m.searchType = TitleSearch
+				// Trigger search with current query
+				return m, performSearch(m.feedManager, m.state, m.selectedFeed, m.searchType, m.searchQuery)
+			}
+			return m, nil
+
 		case "enter":
 			// Accept search and exit search mode (if query is empty, also clear search)
 			if m.searchQuery == "" {
 				m.searchMode = false
 				m.searchActive = false
-				m.feedList = m.unfilteredFeedList
+				switch m.state {
+				case FeedListView:
+					m.feedList = m.unfilteredFeedList
+				case ItemListView:
+					m.itemList = m.unfilteredItemList
+				}
 			} else {
 				m.searchMode = false
-				m.searchActive = true // Mark that feeds are filtered by search
+				m.searchActive = true // Mark that list is filtered by search
 			}
 			m.searchQuery = ""
 			return m, nil
+
 		case "backspace":
 			// Remove last character from search query
 			if len(m.searchQuery) > 0 {
 				m.searchQuery = m.searchQuery[:len(m.searchQuery)-1]
-				m.filterFeedsBySearch()
-				m.cursor = 0
-				m.savedFeedCursor = 0
-			} else {
-				// If query is empty, clear search and restore original feed list
-				m.searchMode = false
-				m.searchActive = false
-				m.feedList = m.unfilteredFeedList
-				m.cursor = 0
-				m.savedFeedCursor = 0
+				switch m.state {
+				case FeedListView:
+					m.cursor = 0
+					m.savedFeedCursor = 0
+				case ItemListView:
+					m.cursor = 0
+					m.savedItemCursor = 0
+				}
+				// If query is now empty, restore unfiltered list
+				if m.searchQuery == "" {
+					switch m.state {
+					case FeedListView:
+						m.feedList = m.unfilteredFeedList
+					case ItemListView:
+						m.itemList = m.unfilteredItemList
+					}
+					return m, nil
+				}
+				// Trigger search with updated query
+				return m, performSearch(m.feedManager, m.state, m.selectedFeed, m.searchType, m.searchQuery)
 			}
 			return m, nil
+
 		default:
 			// Add character to search query if it's a single character
 			key := msg.String()
 			if len(key) == 1 {
 				m.searchQuery += key
-				m.filterFeedsBySearch()
-				m.cursor = 0
-				m.savedFeedCursor = 0
+				switch m.state {
+				case FeedListView:
+					m.cursor = 0
+					m.savedFeedCursor = 0
+				case ItemListView:
+					m.cursor = 0
+					m.savedItemCursor = 0
+				}
+				// Trigger search with updated query
+				return m, performSearch(m.feedManager, m.state, m.selectedFeed, m.searchType, m.searchQuery)
 			}
 			return m, nil
 		}
@@ -1277,12 +1356,35 @@ func (m Model) handleFeedListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 
 	case "/":
-		// Enter search mode
+		// Enter global search mode
 		m.searchMode = true
+		m.searchType = GlobalSearch
 		m.searchQuery = ""
-		// Save current feed list to restore on cancel
-		m.unfilteredFeedList = make([]FeedListItem, len(m.feedList))
-		copy(m.unfilteredFeedList, m.feedList)
+		// Save current state to restore on cancel
+		switch m.state {
+		case FeedListView:
+			m.unfilteredFeedList = make([]FeedListItem, len(m.feedList))
+			copy(m.unfilteredFeedList, m.feedList)
+		case ItemListView:
+			m.unfilteredItemList = make([]database.GetItemsWithReadStatusRow, len(m.itemList))
+			copy(m.unfilteredItemList, m.itemList)
+		}
+		return m, nil
+
+	case "ctrl+f":
+		// Enter title search mode
+		m.searchMode = true
+		m.searchType = TitleSearch
+		m.searchQuery = ""
+		// Save current state to restore on cancel
+		switch m.state {
+		case FeedListView:
+			m.unfilteredFeedList = make([]FeedListItem, len(m.feedList))
+			copy(m.unfilteredFeedList, m.feedList)
+		case ItemListView:
+			m.unfilteredItemList = make([]database.GetItemsWithReadStatusRow, len(m.itemList))
+			copy(m.unfilteredItemList, m.itemList)
+		}
 		return m, nil
 	}
 
@@ -1290,6 +1392,80 @@ func (m Model) handleFeedListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleItemListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// Handle search mode separately
+	if m.searchMode {
+		switch msg.String() {
+		case "esc", "ctrl+c":
+			// Cancel search and restore original list
+			m.searchMode = false
+			m.searchActive = false
+			m.searchQuery = ""
+			m.itemList = m.unfilteredItemList
+			m.cursor = 0
+			m.savedItemCursor = 0
+			return m, nil
+
+		case "/":
+			// Switch to global search mode (if not already)
+			if m.searchType != GlobalSearch {
+				m.searchType = GlobalSearch
+				// Trigger search with current query
+				return m, performSearch(m.feedManager, m.state, m.selectedFeed, m.searchType, m.searchQuery)
+			}
+			return m, nil
+
+		case "ctrl+f":
+			// Switch to title search mode (if not already)
+			if m.searchType != TitleSearch {
+				m.searchType = TitleSearch
+				// Trigger search with current query
+				return m, performSearch(m.feedManager, m.state, m.selectedFeed, m.searchType, m.searchQuery)
+			}
+			return m, nil
+
+		case "enter":
+			// Accept search and exit search mode (if query is empty, also clear search)
+			if m.searchQuery == "" {
+				m.searchMode = false
+				m.searchActive = false
+				m.itemList = m.unfilteredItemList
+			} else {
+				m.searchMode = false
+				m.searchActive = true // Mark that list is filtered by search
+			}
+			m.searchQuery = ""
+			return m, nil
+
+		case "backspace":
+			// Remove last character from search query
+			if len(m.searchQuery) > 0 {
+				m.searchQuery = m.searchQuery[:len(m.searchQuery)-1]
+				m.cursor = 0
+				m.savedItemCursor = 0
+				// If query is now empty, restore unfiltered list
+				if m.searchQuery == "" {
+					m.itemList = m.unfilteredItemList
+					return m, nil
+				}
+				// Trigger search with updated query
+				return m, performSearch(m.feedManager, m.state, m.selectedFeed, m.searchType, m.searchQuery)
+			}
+			return m, nil
+
+		default:
+			// Add character to search query if it's a single character
+			key := msg.String()
+			if len(key) == 1 {
+				m.searchQuery += key
+				m.cursor = 0
+				m.savedItemCursor = 0
+				// Trigger search with updated query
+				return m, performSearch(m.feedManager, m.state, m.selectedFeed, m.searchType, m.searchQuery)
+			}
+			return m, nil
+		}
+	}
+
 	switch msg.String() {
 	case "h", "?":
 		m.previousState = m.state
@@ -1395,6 +1571,26 @@ func (m Model) handleItemListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.cursor = 0
 		m.savedTasksCursor = 0
 		return m, loadTaskList(m.taskManager)
+
+	case "/":
+		// Enter global search mode for items
+		m.searchMode = true
+		m.searchType = GlobalSearch
+		m.searchQuery = ""
+		// Save current item list to restore on cancel
+		m.unfilteredItemList = make([]database.GetItemsWithReadStatusRow, len(m.itemList))
+		copy(m.unfilteredItemList, m.itemList)
+		return m, nil
+
+	case "ctrl+f":
+		// Enter title search mode for items
+		m.searchMode = true
+		m.searchType = TitleSearch
+		m.searchQuery = ""
+		// Save current item list to restore on cancel
+		m.unfilteredItemList = make([]database.GetItemsWithReadStatusRow, len(m.itemList))
+		copy(m.unfilteredItemList, m.itemList)
+		return m, nil
 	}
 
 	return m, nil
@@ -1880,7 +2076,12 @@ func (m Model) renderFeedList() string {
 			}
 			b.WriteString(messageStyle.Render(m.statusMessage))
 		} else if m.searchMode {
-			searchPrompt := "/" + m.searchQuery
+			var searchPrompt string
+			if m.searchType == GlobalSearch {
+				searchPrompt = "Global search (ctrl-f to search only titles): " + m.searchQuery
+			} else {
+				searchPrompt = "Title search ('/' for global search): " + m.searchQuery
+			}
 			b.WriteString(m.getHelpStyle().Render(searchPrompt))
 		}
 		return b.String()
@@ -2070,7 +2271,12 @@ func (m Model) renderFeedList() string {
 		urlPrompt := "Add URL [folders]: " + m.urlInput
 		b.WriteString(m.getHelpStyle().Render(urlPrompt))
 	} else if m.searchMode {
-		searchPrompt := "/" + m.searchQuery
+		var searchPrompt string
+		if m.searchType == GlobalSearch {
+			searchPrompt = "Global search (ctrl-f to search only titles): " + m.searchQuery
+		} else {
+			searchPrompt = "Title search ('/' for global search): " + m.searchQuery
+		}
 		b.WriteString(m.getHelpStyle().Render(searchPrompt))
 	}
 
@@ -2102,14 +2308,30 @@ func (m Model) renderItemList() string {
 	if len(m.itemList) == 0 {
 		content := "No items found."
 		// Calculate padding to push status bar to bottom
-		contentLines := strings.Count(b.String()+content, "\n") + 2
-		padding := m.height - contentLines - 1
+		// usedLines = title (1) + empty line (1) + content (1) + status bar (1) + search line (1)
+		headerLines := 2  // title + empty line after header
+		contentLines := 1 // "No items found."
+		bottomLines := 2  // status bar + search line
+		usedLines := headerLines + contentLines + bottomLines
+		padding := m.height - usedLines
 		if padding < 0 {
 			padding = 0
 		}
 		b.WriteString(content)
+		b.WriteString("\n")
 		b.WriteString(strings.Repeat("\n", padding))
 		b.WriteString(statusBar)
+		b.WriteString("\n")
+		// Add search prompt line if in search mode
+		if m.searchMode {
+			var searchPrompt string
+			if m.searchType == GlobalSearch {
+				searchPrompt = "Global search (ctrl-f to search only titles): " + m.searchQuery
+			} else {
+				searchPrompt = "Title search ('/' for global search): " + m.searchQuery
+			}
+			b.WriteString(m.getHelpStyle().Render(searchPrompt))
+		}
 		return b.String()
 	}
 
@@ -2119,8 +2341,9 @@ func (m Model) renderItemList() string {
 	// - Empty line after header (1)
 	// - Status bar at bottom (1)
 	// - Scroll indicator line (1)
-	// Total: 4 lines
-	availableHeight := m.height - 4
+	// - Search prompt line (1) - always allocated
+	// Total: 5 lines
+	availableHeight := m.height - 5
 	if availableHeight < 3 {
 		availableHeight = 3 // Minimum usable height
 	}
@@ -2175,9 +2398,10 @@ func (m Model) renderItemList() string {
 	}
 
 	// Calculate padding to push status bar to bottom
-	headerLines := 2 // title + empty line
-	usedLines := headerLines + itemLines
-	padding := m.height - usedLines - 1 // -1 for status bar line
+	headerLines := 2    // title + empty line
+	statusBarLines := 2 // (scroll info + status bar on same line) + search line
+	usedLines := headerLines + itemLines + statusBarLines
+	padding := m.height - usedLines
 	if padding < 0 {
 		padding = 0
 	}
@@ -2191,6 +2415,18 @@ func (m Model) renderItemList() string {
 	}
 
 	b.WriteString(statusBar)
+
+	// Show search prompt line
+	b.WriteString("\n")
+	if m.searchMode {
+		var searchPrompt string
+		if m.searchType == GlobalSearch {
+			searchPrompt = "Global search (ctrl-f to search only titles): " + m.searchQuery
+		} else {
+			searchPrompt = "Title search ('/' for global search): " + m.searchQuery
+		}
+		b.WriteString(m.getHelpStyle().Render(searchPrompt))
+	}
 
 	return b.String()
 }
@@ -2748,7 +2984,8 @@ func (m Model) renderHelpView() string {
 	content.WriteString(fmt.Sprintf("  %-15s %s\n", "R", "Refresh all feeds"))
 	content.WriteString(fmt.Sprintf("  %-15s %s\n", "A", "Mark all items in feed as read"))
 	content.WriteString(fmt.Sprintf("  %-15s %s\n", "i", "Show feed info"))
-	content.WriteString(fmt.Sprintf("  %-15s %s\n", "/", "Search feeds"))
+	content.WriteString(fmt.Sprintf("  %-15s %s\n", "/", "Global search (text of all feeds)"))
+	content.WriteString(fmt.Sprintf("  %-15s %s\n", "ctrl+f", "Title search only"))
 	content.WriteString(fmt.Sprintf("  %-15s %s\n", "u", "Add URL (with discovery)"))
 	content.WriteString(fmt.Sprintf("  %-15s %s\n", "U", "Edit URLs in $EDITOR"))
 	content.WriteString(fmt.Sprintf("  %-15s %s\n", "ctrl+r", "Reload URLs from file"))
@@ -2762,6 +2999,8 @@ func (m Model) renderHelpView() string {
 	content.WriteString(fmt.Sprintf("  %-15s %s\n", "r", "Refresh feed"))
 	content.WriteString(fmt.Sprintf("  %-15s %s\n", "R", "Refresh all feeds"))
 	content.WriteString(fmt.Sprintf("  %-15s %s\n", "A", "Mark all items as read"))
+	content.WriteString(fmt.Sprintf("  %-15s %s\n", "/", "Global search (text of all feeds)"))
+	content.WriteString(fmt.Sprintf("  %-15s %s\n", "ctrl+f", "Title search only"))
 	content.WriteString(fmt.Sprintf("  %-15s %s\n", "N", "Toggle read status of item"))
 	content.WriteString(fmt.Sprintf("  %-15s %s\n", "o", "Open item link in browser"))
 	content.WriteString(fmt.Sprintf("  %-15s %s\n", "c", "View settings"))

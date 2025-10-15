@@ -182,3 +182,60 @@ LEFT JOIN read_status rs ON i.id = rs.item_id
 WHERE f.visible = TRUE
 GROUP BY ff.folder_name
 ORDER BY ff.folder_name;
+
+-- name: SearchFeedsByTitle :many
+SELECT
+    f.id,
+    f.title,
+    f.url,
+    f.last_error,
+    f.last_error_time,
+    COUNT(i.id) as total_items,
+    COUNT(CASE WHEN i.id IS NOT NULL AND COALESCE(rs.read, FALSE) = FALSE THEN 1 END) as unread_items
+FROM feeds f
+LEFT JOIN items i ON f.id = i.feed_id
+LEFT JOIN read_status rs ON i.id = rs.item_id
+WHERE f.visible = TRUE AND f.title LIKE '%' || ? || '%'
+GROUP BY f.id, f.title, f.url, f.last_error, f.last_error_time
+ORDER BY f.title;
+
+-- name: SearchFeedsGlobally :many
+SELECT
+    f.id,
+    f.title,
+    f.url,
+    f.last_error,
+    f.last_error_time,
+    COUNT(i.id) as total_items,
+    COUNT(CASE WHEN i.id IS NOT NULL AND COALESCE(rs.read, FALSE) = FALSE THEN 1 END) as unread_items
+FROM feeds f
+LEFT JOIN items i ON f.id = i.feed_id
+LEFT JOIN read_status rs ON i.id = rs.item_id
+WHERE f.visible = TRUE
+    AND (f.title LIKE '%' || ? || '%'
+         OR f.description LIKE '%' || ? || '%'
+         OR EXISTS (
+             SELECT 1 FROM items i2
+             WHERE i2.feed_id = f.id
+             AND (i2.title LIKE '%' || ? || '%' OR i2.description LIKE '%' || ? || '%' OR i2.content LIKE '%' || ? || '%')
+         ))
+GROUP BY f.id, f.title, f.url, f.last_error, f.last_error_time
+ORDER BY f.title;
+
+-- name: SearchItemsByTitle :many
+SELECT
+    i.*,
+    COALESCE(rs.read, FALSE) as read
+FROM items i
+LEFT JOIN read_status rs ON i.id = rs.item_id
+WHERE i.feed_id = ? AND i.title LIKE '%' || ? || '%'
+ORDER BY i.published DESC;
+
+-- name: SearchItemsGlobally :many
+SELECT
+    i.*,
+    COALESCE(rs.read, FALSE) as read
+FROM items i
+LEFT JOIN read_status rs ON i.id = rs.item_id
+WHERE i.feed_id = ? AND (i.title LIKE '%' || ? || '%' OR i.description LIKE '%' || ? || '%' OR i.content LIKE '%' || ? || '%')
+ORDER BY i.published DESC;

@@ -723,6 +723,274 @@ func (q *Queries) MarkItemUnread(ctx context.Context, itemID int64) error {
 	return err
 }
 
+const searchFeedsByTitle = `-- name: SearchFeedsByTitle :many
+SELECT
+    f.id,
+    f.title,
+    f.url,
+    f.last_error,
+    f.last_error_time,
+    COUNT(i.id) as total_items,
+    COUNT(CASE WHEN i.id IS NOT NULL AND COALESCE(rs.read, FALSE) = FALSE THEN 1 END) as unread_items
+FROM feeds f
+LEFT JOIN items i ON f.id = i.feed_id
+LEFT JOIN read_status rs ON i.id = rs.item_id
+WHERE f.visible = TRUE AND f.title LIKE '%' || ? || '%'
+GROUP BY f.id, f.title, f.url, f.last_error, f.last_error_time
+ORDER BY f.title
+`
+
+type SearchFeedsByTitleRow struct {
+	ID            int64          `json:"id"`
+	Title         string         `json:"title"`
+	Url           string         `json:"url"`
+	LastError     sql.NullString `json:"last_error"`
+	LastErrorTime sql.NullTime   `json:"last_error_time"`
+	TotalItems    int64          `json:"total_items"`
+	UnreadItems   int64          `json:"unread_items"`
+}
+
+func (q *Queries) SearchFeedsByTitle(ctx context.Context, dollar_1 sql.NullString) ([]SearchFeedsByTitleRow, error) {
+	rows, err := q.db.QueryContext(ctx, searchFeedsByTitle, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []SearchFeedsByTitleRow
+	for rows.Next() {
+		var i SearchFeedsByTitleRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Title,
+			&i.Url,
+			&i.LastError,
+			&i.LastErrorTime,
+			&i.TotalItems,
+			&i.UnreadItems,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const searchFeedsGlobally = `-- name: SearchFeedsGlobally :many
+SELECT
+    f.id,
+    f.title,
+    f.url,
+    f.last_error,
+    f.last_error_time,
+    COUNT(i.id) as total_items,
+    COUNT(CASE WHEN i.id IS NOT NULL AND COALESCE(rs.read, FALSE) = FALSE THEN 1 END) as unread_items
+FROM feeds f
+LEFT JOIN items i ON f.id = i.feed_id
+LEFT JOIN read_status rs ON i.id = rs.item_id
+WHERE f.visible = TRUE
+    AND (f.title LIKE '%' || ? || '%'
+         OR f.description LIKE '%' || ? || '%'
+         OR EXISTS (
+             SELECT 1 FROM items i2
+             WHERE i2.feed_id = f.id
+             AND (i2.title LIKE '%' || ? || '%' OR i2.description LIKE '%' || ? || '%' OR i2.content LIKE '%' || ? || '%')
+         ))
+GROUP BY f.id, f.title, f.url, f.last_error, f.last_error_time
+ORDER BY f.title
+`
+
+type SearchFeedsGloballyParams struct {
+	Column1 sql.NullString `json:"column_1"`
+	Column2 sql.NullString `json:"column_2"`
+	Column3 sql.NullString `json:"column_3"`
+	Column4 sql.NullString `json:"column_4"`
+	Column5 sql.NullString `json:"column_5"`
+}
+
+type SearchFeedsGloballyRow struct {
+	ID            int64          `json:"id"`
+	Title         string         `json:"title"`
+	Url           string         `json:"url"`
+	LastError     sql.NullString `json:"last_error"`
+	LastErrorTime sql.NullTime   `json:"last_error_time"`
+	TotalItems    int64          `json:"total_items"`
+	UnreadItems   int64          `json:"unread_items"`
+}
+
+func (q *Queries) SearchFeedsGlobally(ctx context.Context, arg SearchFeedsGloballyParams) ([]SearchFeedsGloballyRow, error) {
+	rows, err := q.db.QueryContext(ctx, searchFeedsGlobally,
+		arg.Column1,
+		arg.Column2,
+		arg.Column3,
+		arg.Column4,
+		arg.Column5,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []SearchFeedsGloballyRow
+	for rows.Next() {
+		var i SearchFeedsGloballyRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Title,
+			&i.Url,
+			&i.LastError,
+			&i.LastErrorTime,
+			&i.TotalItems,
+			&i.UnreadItems,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const searchItemsByTitle = `-- name: SearchItemsByTitle :many
+SELECT
+    i.id, i.feed_id, i.guid, i.title, i.description, i.content, i.link, i.published, i.created_at,
+    COALESCE(rs.read, FALSE) as read
+FROM items i
+LEFT JOIN read_status rs ON i.id = rs.item_id
+WHERE i.feed_id = ? AND i.title LIKE '%' || ? || '%'
+ORDER BY i.published DESC
+`
+
+type SearchItemsByTitleParams struct {
+	FeedID  int64          `json:"feed_id"`
+	Column2 sql.NullString `json:"column_2"`
+}
+
+type SearchItemsByTitleRow struct {
+	ID          int64        `json:"id"`
+	FeedID      int64        `json:"feed_id"`
+	Guid        string       `json:"guid"`
+	Title       string       `json:"title"`
+	Description string       `json:"description"`
+	Content     string       `json:"content"`
+	Link        string       `json:"link"`
+	Published   sql.NullTime `json:"published"`
+	CreatedAt   sql.NullTime `json:"created_at"`
+	Read        bool         `json:"read"`
+}
+
+func (q *Queries) SearchItemsByTitle(ctx context.Context, arg SearchItemsByTitleParams) ([]SearchItemsByTitleRow, error) {
+	rows, err := q.db.QueryContext(ctx, searchItemsByTitle, arg.FeedID, arg.Column2)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []SearchItemsByTitleRow
+	for rows.Next() {
+		var i SearchItemsByTitleRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.FeedID,
+			&i.Guid,
+			&i.Title,
+			&i.Description,
+			&i.Content,
+			&i.Link,
+			&i.Published,
+			&i.CreatedAt,
+			&i.Read,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const searchItemsGlobally = `-- name: SearchItemsGlobally :many
+SELECT
+    i.id, i.feed_id, i.guid, i.title, i.description, i.content, i.link, i.published, i.created_at,
+    COALESCE(rs.read, FALSE) as read
+FROM items i
+LEFT JOIN read_status rs ON i.id = rs.item_id
+WHERE i.feed_id = ? AND (i.title LIKE '%' || ? || '%' OR i.description LIKE '%' || ? || '%' OR i.content LIKE '%' || ? || '%')
+ORDER BY i.published DESC
+`
+
+type SearchItemsGloballyParams struct {
+	FeedID  int64          `json:"feed_id"`
+	Column2 sql.NullString `json:"column_2"`
+	Column3 sql.NullString `json:"column_3"`
+	Column4 sql.NullString `json:"column_4"`
+}
+
+type SearchItemsGloballyRow struct {
+	ID          int64        `json:"id"`
+	FeedID      int64        `json:"feed_id"`
+	Guid        string       `json:"guid"`
+	Title       string       `json:"title"`
+	Description string       `json:"description"`
+	Content     string       `json:"content"`
+	Link        string       `json:"link"`
+	Published   sql.NullTime `json:"published"`
+	CreatedAt   sql.NullTime `json:"created_at"`
+	Read        bool         `json:"read"`
+}
+
+func (q *Queries) SearchItemsGlobally(ctx context.Context, arg SearchItemsGloballyParams) ([]SearchItemsGloballyRow, error) {
+	rows, err := q.db.QueryContext(ctx, searchItemsGlobally,
+		arg.FeedID,
+		arg.Column2,
+		arg.Column3,
+		arg.Column4,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []SearchItemsGloballyRow
+	for rows.Next() {
+		var i SearchItemsGloballyRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.FeedID,
+			&i.Guid,
+			&i.Title,
+			&i.Description,
+			&i.Content,
+			&i.Link,
+			&i.Published,
+			&i.CreatedAt,
+			&i.Read,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const setSetting = `-- name: SetSetting :exec
 INSERT INTO settings (key, value, updated_at)
 VALUES (?, ?, CURRENT_TIMESTAMP)

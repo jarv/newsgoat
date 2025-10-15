@@ -1,0 +1,18 @@
+{
+  "config": {
+    "default": true,
+    "code-block-style": { "style": "fenced" },
+    "header-style": { "style": "atx" },
+    "hr-style": { "style": "---" },
+    "line-length": {
+      "code_blocks": false,
+      "tables": false,
+      "headings": true,
+      "heading_line_length": 100,
+      "line_length": 5000
+    },
+    "no-bare-urls": false,
+    "no-inline-html": false,
+    "no-trailing-punctuation": { "punctuation": ".,;:!。，；：！？" }
+  }
+}

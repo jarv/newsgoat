@@ -29,16 +29,18 @@ var GlobalKeys = []KeyBinding{
 
 // View-specific key bindings
 var FeedListViewKeys = ViewKeyBindings{
-	AllowedKeys: []string{"r", "R", "l", "t", "c", "U", "u", "i", "/"},
+	AllowedKeys: []string{"r", "R", "l", "t", "c", "U", "u", "i", "/", "ctrl+f"},
 	StatusBar: []KeyBinding{
+		{"/", "search"},
 		{"c", "config"},
 		{"r/R", "reload"},
 	},
 }
 
 var ItemListViewKeys = ViewKeyBindings{
-	AllowedKeys: []string{"r", "R", "A"},
+	AllowedKeys: []string{"r", "R", "A", "/", "ctrl+f"},
 	StatusBar: []KeyBinding{
+		{"/", "search"},
 		{"r/R", "reload"},
 	},
 }

@@ -39,9 +39,8 @@ func InitDBWithSchema(schemaSQL string) (*sql.DB, *Queries, error) {
 		dbPath = newPath
 	}
 
-	// Add SQLite connection parameters for better concurrency
-	// dsn := dbPath + "?_busy_timeout=60000&_journal_mode=WAL&_synchronous=NORMAL&_cache_size=2000&_locking_mode=NORMAL&_foreign_keys=ON"
-	db, err := sql.Open("sqlite3", dbPath) // dsn)
+	// Open database with standard SQLite driver
+	db, err := sql.Open("sqlite3", dbPath)
 	if err != nil {
 		return nil, nil, err
 	}

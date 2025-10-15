@@ -444,3 +444,63 @@ func syncFeedsWithURLs(feedManager *feeds.Manager, queries *database.Queries, ur
 		return loadFeedList(feedManager)()
 	}
 }
+
+func performSearch(feedManager *feeds.Manager, viewState ViewState, feedID int64, searchType SearchType, query string) tea.Cmd {
+	return func() tea.Msg {
+		// If query is empty, return empty results (will restore unfiltered list)
+		if query == "" {
+			return SearchResultsMsg{}
+		}
+
+		switch viewState {
+		case FeedListView:
+			// Search feeds
+			if searchType == TitleSearch {
+				results, err := feedManager.SearchFeedsByTitle(query)
+				if err != nil {
+					logging.Error("performSearch: SearchFeedsByTitle failed", "query", query, "error", err)
+					return ErrorMsg{Err: err}
+				}
+				return SearchResultsMsg{FeedResults: results, IsGlobal: false}
+			} else {
+				// Global search
+				results, err := feedManager.SearchFeedsGlobally(query)
+				if err != nil {
+					logging.Error("performSearch: SearchFeedsGlobally failed", "query", query, "error", err)
+					return ErrorMsg{Err: err}
+				}
+				// Convert to []database.SearchFeedsByTitleRow for compatibility
+				converted := make([]database.SearchFeedsByTitleRow, len(results))
+				for i, r := range results {
+					converted[i] = database.SearchFeedsByTitleRow(r)
+				}
+				return SearchResultsMsg{FeedResults: converted, IsGlobal: true}
+			}
+		case ItemListView:
+			// Search items in current feed
+			if searchType == TitleSearch {
+				results, err := feedManager.SearchItemsByTitle(feedID, query)
+				if err != nil {
+					logging.Error("performSearch: SearchItemsByTitle failed", "feedID", feedID, "query", query, "error", err)
+					return ErrorMsg{Err: err}
+				}
+				return SearchResultsMsg{ItemResults: results, IsGlobal: false}
+			} else {
+				// Global search
+				results, err := feedManager.SearchItemsGlobally(feedID, query)
+				if err != nil {
+					logging.Error("performSearch: SearchItemsGlobally failed", "feedID", feedID, "query", query, "error", err)
+					return ErrorMsg{Err: err}
+				}
+				// Convert to []database.SearchItemsByTitleRow for compatibility
+				converted := make([]database.SearchItemsByTitleRow, len(results))
+				for i, r := range results {
+					converted[i] = database.SearchItemsByTitleRow(r)
+				}
+				return SearchResultsMsg{ItemResults: converted, IsGlobal: true}
+			}
+		}
+
+		return SearchResultsMsg{}
+	}
+}
