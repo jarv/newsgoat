@@ -1,3 +1,10 @@
+## [1.10.1](https://github.com/jarv/newsgoat/compare/v1.10.0...v1.10.1) (2025-10-16)
+
+
+### Bug Fixes
+
+* lint fixes and spurious log message ([107d875](https://github.com/jarv/newsgoat/commit/107d8750d52e44ed3afc72e4126319f464c560f0))
+
 # [1.10.0](https://github.com/jarv/newsgoat/compare/v1.9.0...v1.10.0) (2025-10-16)
 
 
