@@ -64,11 +64,40 @@ If you know of any other CLI based RSS readers worth mentioning here please add 
 
 Create a `.config/newsgoat/urls` file with one feed per line.
 
-## Build and Run
+## Development
+
+### Setup
+
+1. Install [mise](https://mise.jdx.dev/) for tool version management
+2. Clone the repository
+3. Enable git hooks:
 
 ```bash
-go run . # Run with urls file in .config/newsgoat/urls
-go run . -urlFile urls.example # Run using the example urls file
+mise run setup-hooks
+```
+
+This will configure git to run the linter before each commit.
+
+### Building
+
+```bash
+mise run build    # Build the binary
+go run .          # Run with urls file in .config/newsgoat/urls
+go run . -urlFile urls.example  # Run using the example urls file
+```
+
+### Linting
+
+The project uses golangci-lint for code quality:
+
+```bash
+mise run lint     # Run the linter
+```
+
+The linter runs automatically on every commit via a pre-commit hook. To bypass temporarily (not recommended):
+
+```bash
+git commit --no-verify
 ```
 
 ## Install

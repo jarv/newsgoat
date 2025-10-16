@@ -1,0 +1,14 @@
+#!/bin/sh
+# Pre-commit hook to run linter
+
+echo "Running linter..."
+mise run lint
+
+if [ $? -ne 0 ]; then
+    echo "❌ Linter failed. Please fix the issues before committing."
+    echo "Run 'mise run lint' to see the full output."
+    exit 1
+fi
+
+echo "✅ Linter passed"
+exit 0

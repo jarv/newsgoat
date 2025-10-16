@@ -6,7 +6,7 @@ nodejs = "22.20.0"
 shfmt = "3.12.0"
 vale = "3.3.0"
 
-[tasks.golangci-lint]
+[tasks.lint]
 run = "golangci-lint run ./..."
 
 [tasks.build]
@@ -20,6 +20,17 @@ sources =[
   '**/*',
 ]
 run = "go run ."
+
+[tasks.setup-hooks]
+run = """
+git config core.hooksPath .githooks
+echo "✅ Git hooks configured successfully!"
+echo ""
+echo "The following hooks are now active:"
+echo "  - pre-commit: Runs 'mise run lint' before each commit"
+echo ""
+echo "To bypass the pre-commit hook (not recommended), use: git commit --no-verify"
+"""
 
 [tasks.build-release]
 run = """
