@@ -1,3 +1,10 @@
+## [1.10.2](https://github.com/jarv/newsgoat/compare/v1.10.1...v1.10.2) (2025-10-16)
+
+
+### Bug Fixes
+
+* Improves explainer text for url file ([7367445](https://github.com/jarv/newsgoat/commit/73674454c8d98c2c1026a23cb31e8fdf7c724e83))
+
 ## [1.10.1](https://github.com/jarv/newsgoat/compare/v1.10.0...v1.10.1) (2025-10-16)
 
 
