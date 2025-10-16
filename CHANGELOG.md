@@ -1,3 +1,10 @@
+# [1.10.0](https://github.com/jarv/newsgoat/compare/v1.9.0...v1.10.0) (2025-10-16)
+
+
+### Features
+
+* Adds version check on start ([a70a2e9](https://github.com/jarv/newsgoat/commit/a70a2e911b9f309fc671cdb80c777ca622d8a0de))
+
 # [1.9.0](https://github.com/jarv/newsgoat/compare/v1.8.2...v1.9.0) (2025-10-15)
 
 
