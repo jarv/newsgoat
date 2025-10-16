@@ -354,7 +354,23 @@ func CreateSampleURLsFile() error {
 	}()
 
 	writer := bufio.NewWriter(file)
-	if _, err := writer.WriteString("# Add your RSS feeds to this file\n"); err != nil {
+
+	// Write header with instructions and examples
+	header := `# Add your RSS feeds to this file
+#
+# Format: <url> [folder1,folder2,...]
+# - Each line should contain a feed URL
+# - Optionally, you can add one or more folder names after the URL (comma-separated)
+# - Folders with spaces should be quoted: "Folder Name"
+# - Lines starting with # are comments and will be ignored
+#
+# For example:
+# https://www.newscientist.com/feed/home/
+# https://arstechnica.com/feed/ "Tech News"
+#
+`
+
+	if _, err := writer.WriteString(header); err != nil {
 		return err
 	}
 
