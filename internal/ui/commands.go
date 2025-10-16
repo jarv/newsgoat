@@ -258,7 +258,7 @@ func quitApp(taskManager tasks.Manager) tea.Cmd {
 	return func() tea.Msg {
 		// Stop task manager to cancel all in-progress tasks
 		if err := taskManager.Stop(); err != nil {
-			logging.Error("Failed to stop task manager on quit", "error", err)
+			logging.Debug("Task manager already stopped", "error", err)
 		}
 		return tea.Quit()
 	}

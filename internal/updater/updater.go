@@ -64,7 +64,11 @@ func CheckForUpdate() (*UpdateInfo, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch release info: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			logging.Debug("Failed to close response body", "error", closeErr)
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
@@ -139,7 +143,11 @@ func DownloadAndInstall(downloadURL string) error {
 	if err != nil {
 		return fmt.Errorf("failed to download update: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			logging.Debug("Failed to close response body", "error", closeErr)
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("download failed with status: %d", resp.StatusCode)
@@ -153,13 +161,19 @@ func DownloadAndInstall(downloadURL string) error {
 		return fmt.Errorf("failed to create temp file: %w", err)
 	}
 	tmpPath := tmpFile.Name()
-	defer os.Remove(tmpPath) // Clean up if something goes wrong
+	defer func() {
+		if removeErr := os.Remove(tmpPath); removeErr != nil {
+			logging.Debug("Failed to remove temp file", "path", tmpPath, "error", removeErr)
+		}
+	}()
 
 	logging.Debug("Created temporary file", "path", tmpPath)
 
 	// Write downloaded content to temp file
 	bytesWritten, err := io.Copy(tmpFile, resp.Body)
-	tmpFile.Close()
+	if closeErr := tmpFile.Close(); closeErr != nil {
+		return fmt.Errorf("failed to close temp file: %w", closeErr)
+	}
 	if err != nil {
 		return fmt.Errorf("failed to write update: %w", err)
 	}
@@ -187,13 +201,17 @@ func DownloadAndInstall(downloadURL string) error {
 	if err := os.Rename(tmpPath, execPath); err != nil {
 		// Restore backup if move fails
 		logging.Error("Failed to install update, restoring backup", "error", err)
-		os.Rename(backupPath, execPath)
+		if restoreErr := os.Rename(backupPath, execPath); restoreErr != nil {
+			logging.Error("Failed to restore backup", "error", restoreErr)
+		}
 		return fmt.Errorf("failed to install update: %w", err)
 	}
 
 	// Remove backup on success
 	logging.Debug("Removing backup file", "path", backupPath)
-	os.Remove(backupPath)
+	if removeErr := os.Remove(backupPath); removeErr != nil {
+		logging.Debug("Failed to remove backup file", "path", backupPath, "error", removeErr)
+	}
 
 	logging.Info("Update installed successfully", "path", execPath)
 

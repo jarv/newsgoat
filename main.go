@@ -149,7 +149,7 @@ func run(urlFile string, debug bool) error {
 	}
 	defer func() {
 		if stopErr := taskManager.Stop(); stopErr != nil {
-			logger.Error("Error stopping task manager", "error", stopErr)
+			logger.Debug("Task manager already stopped", "error", stopErr)
 		}
 	}()
 
