@@ -18,6 +18,7 @@ type Config struct {
 	SpinnerType         string
 	ShowReadFeeds       bool
 	UnreadOnTop         bool // Show feeds with unread items at the top
+	CheckForUpdates     bool // Check for updates on launch
 }
 
 // Setting keys
@@ -32,6 +33,7 @@ const (
 	KeySpinnerType         = "spinner_type"
 	KeyShowReadFeeds       = "show_read_feeds"
 	KeyUnreadOnTop         = "unread_on_top"
+	KeyCheckForUpdates     = "check_for_updates"
 )
 
 func GetDefaultConfig() Config {
@@ -46,6 +48,7 @@ func GetDefaultConfig() Config {
 		SpinnerType:         "braille",
 		ShowReadFeeds:       true,
 		UnreadOnTop:         true, // Show unread feeds at top by default
+		CheckForUpdates:     true, // Check for updates on launch by default
 	}
 }
 
@@ -107,6 +110,11 @@ func LoadConfig(queries *database.Queries) (Config, error) {
 	// Load unread on top
 	if val, err := getSetting(queries, ctx, KeyUnreadOnTop); err == nil {
 		config.UnreadOnTop = (val == "true" || val == "yes")
+	}
+
+	// Load check for updates
+	if val, err := getSetting(queries, ctx, KeyCheckForUpdates); err == nil {
+		config.CheckForUpdates = (val == "true" || val == "yes")
 	}
 
 	// Validate config values
@@ -193,6 +201,15 @@ func SaveConfig(queries *database.Queries, config Config) error {
 		unreadOnTopStr = "true"
 	}
 	if err := setSetting(queries, ctx, KeyUnreadOnTop, unreadOnTopStr); err != nil {
+		return err
+	}
+
+	// Save check for updates
+	checkForUpdatesStr := "false"
+	if config.CheckForUpdates {
+		checkForUpdatesStr = "true"
+	}
+	if err := setSetting(queries, ctx, KeyCheckForUpdates, checkForUpdatesStr); err != nil {
 		return err
 	}
 
