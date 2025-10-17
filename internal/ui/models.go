@@ -539,6 +539,21 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case ItemListLoadedMsg:
 		m.itemList = msg.Items
+
+		// Sort items if UnreadOnTop is enabled
+		if m.config.UnreadOnTop {
+			sort.SliceStable(m.itemList, func(i, j int) bool {
+				// Unread items (Read = false) come first
+				iIsUnread := !m.itemList[i].Read
+				jIsUnread := !m.itemList[j].Read
+				if iIsUnread != jIsUnread {
+					return iIsUnread
+				}
+				// Within each group, maintain original order (stable sort)
+				return false
+			})
+		}
+
 		if m.state == ItemListView {
 			// Preserve cursor position when refreshing
 			m.cursor = m.savedItemCursor
