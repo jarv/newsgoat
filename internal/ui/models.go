@@ -20,6 +20,7 @@ import (
 	"github.com/jarv/newsgoat/internal/logging"
 	"github.com/jarv/newsgoat/internal/tasks"
 	"github.com/jarv/newsgoat/internal/themes"
+	"github.com/jarv/newsgoat/internal/updater"
 	"github.com/jarv/newsgoat/internal/version"
 )
 
@@ -1289,6 +1290,12 @@ func (m Model) handleFeedListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "ctrl+u":
 		// If update is available, install it (takes priority)
 		if m.updateAvailable && m.updateInfo != nil && !m.installingUpdate {
+			// Check write permission before attempting update
+			if err := updater.CheckWritePermission(); err != nil {
+				m.statusMessage = fmt.Sprintf("Update failed: %v", err)
+				m.statusMessageType = "error"
+				return m, nil
+			}
 			m.installingUpdate = true
 			m.statusMessage = "Installing update..."
 			m.statusMessageType = "info"

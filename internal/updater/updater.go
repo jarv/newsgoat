@@ -116,6 +116,35 @@ func CheckForUpdate() (*UpdateInfo, error) {
 	}, nil
 }
 
+// CheckWritePermission checks if we have permission to write to the binary location
+func CheckWritePermission() error {
+	// Get current executable path
+	execPath, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("failed to get executable path: %w", err)
+	}
+
+	// Resolve symlinks
+	execPath, err = filepath.EvalSymlinks(execPath)
+	if err != nil {
+		return fmt.Errorf("failed to resolve symlinks: %w", err)
+	}
+
+	// Try to open the file for writing (without truncating)
+	file, err := os.OpenFile(execPath, os.O_WRONLY, 0)
+	if err != nil {
+		if os.IsPermission(err) {
+			return fmt.Errorf("permission denied: cannot write to %s (try running with sudo or installing to a user-writable location)", execPath)
+		}
+		return fmt.Errorf("cannot write to %s: %w", execPath, err)
+	}
+	if closeErr := file.Close(); closeErr != nil {
+		logging.Debug("Failed to close file during permission check", "path", execPath, "error", closeErr)
+	}
+
+	return nil
+}
+
 // DownloadAndInstall downloads the latest version and replaces the current binary
 func DownloadAndInstall(downloadURL string) error {
 	logging.Info("Starting update installation", "download_url", downloadURL)
@@ -187,8 +216,26 @@ func DownloadAndInstall(downloadURL string) error {
 
 	logging.Debug("Set executable permissions on temp file")
 
-	// Backup current binary
-	backupPath := execPath + ".backup"
+	// Create backup in temp directory (not in binary's directory which may require elevated permissions)
+	backupFile, err := os.CreateTemp("", "newsgoat-backup-*")
+	if err != nil {
+		return fmt.Errorf("failed to create backup temp file: %w", err)
+	}
+	backupPath := backupFile.Name()
+	if closeErr := backupFile.Close(); closeErr != nil {
+		return fmt.Errorf("failed to close backup temp file: %w", closeErr)
+	}
+	// Remove the empty temp file so we can rename the binary to it
+	if removeErr := os.Remove(backupPath); removeErr != nil {
+		return fmt.Errorf("failed to remove backup temp file: %w", removeErr)
+	}
+
+	defer func() {
+		if removeErr := os.Remove(backupPath); removeErr != nil {
+			logging.Debug("Failed to remove backup file", "path", backupPath, "error", removeErr)
+		}
+	}()
+
 	logging.Debug("Backing up current binary", "from", execPath, "to", backupPath)
 
 	if err := os.Rename(execPath, backupPath); err != nil {
@@ -205,12 +252,6 @@ func DownloadAndInstall(downloadURL string) error {
 			logging.Error("Failed to restore backup", "error", restoreErr)
 		}
 		return fmt.Errorf("failed to install update: %w", err)
-	}
-
-	// Remove backup on success
-	logging.Debug("Removing backup file", "path", backupPath)
-	if removeErr := os.Remove(backupPath); removeErr != nil {
-		logging.Debug("Failed to remove backup file", "path", backupPath, "error", removeErr)
 	}
 
 	logging.Info("Update installed successfully", "path", execPath)
