@@ -1,3 +1,10 @@
+# [1.11.0](https://github.com/jarv/newsgoat/compare/v1.10.2...v1.11.0) (2025-10-17)
+
+
+### Features
+
+* Adds scrolling navigation for feed titles ([8ec9025](https://github.com/jarv/newsgoat/commit/8ec90251866142d827788bb3cb5d8faf2afaad04))
+
 ## [1.10.2](https://github.com/jarv/newsgoat/compare/v1.10.1...v1.10.2) (2025-10-16)
 
 
