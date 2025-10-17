@@ -23,7 +23,7 @@ import (
 	"github.com/jarv/newsgoat/internal/version"
 )
 
-const globalHelp string = "h: help"
+const globalHelp string = "?: help | q: quit"
 
 func min(a, b int) int {
 	if a < b {
@@ -116,7 +116,14 @@ func getDisplayTitle(feed database.GetFeedStatsRow) string {
 		if strings.Contains(feed.Url, "commits") {
 			// Remove https:// and .atom from the URL for display
 			displayTitle := strings.TrimPrefix(feed.Url, "https://")
-			return strings.TrimSuffix(displayTitle, ".atom")
+			displayTitle = strings.TrimSuffix(displayTitle, ".atom")
+
+			// Strip query parameters (e.g., ?format=atom)
+			if idx := strings.Index(displayTitle, "?"); idx != -1 {
+				displayTitle = displayTitle[:idx]
+			}
+
+			return displayTitle
 		}
 		return feed.Title
 	default:
@@ -177,6 +184,7 @@ type Model struct {
 	helpViewScroll                  int // Scroll offset for help view
 	articleViewScroll               int // Scroll offset for article view
 	urlsViewScroll                  int // Scroll offset for URLs view
+	itemTitleScrollOffset           int // Horizontal scroll offset for item titles
 	selectedFeed                    int64
 	width                           int
 	height                          int
@@ -356,13 +364,39 @@ type UpdateInstallErrorMsg struct {
 	err error
 }
 
-func NewModel(feedManager *feeds.Manager, taskManager tasks.Manager, queries *database.Queries, cfg config.Config) Model {
-	// Create glamour renderer based on theme
-	theme := themes.GetThemeByName(cfg.ThemeName)
-	renderer, err := glamour.NewTermRenderer(
+// createGlamourRenderer creates a glamour renderer with the given theme
+// and configures it to hide link URLs (since we add [1], [2] markers manually)
+func createGlamourRenderer(themeName string) (*glamour.TermRenderer, error) {
+	theme := themes.GetThemeByName(themeName)
+
+	// First create a renderer with the standard style to get the base config
+	baseRenderer, err := glamour.NewTermRenderer(
 		glamour.WithStandardStyle(theme.GlamourStyle),
 		glamour.WithWordWrap(80),
 	)
+	if err != nil {
+		return nil, err
+	}
+
+	// Create a new renderer with the custom Link style to hide URLs
+	// The format template returns empty string, effectively hiding the URL
+	renderer, err := glamour.NewTermRenderer(
+		glamour.WithStandardStyle(theme.GlamourStyle),
+		glamour.WithWordWrap(80),
+		glamour.WithStylesFromJSONBytes([]byte(`{"link": {"format": "{{if false}}{{.text}}{{end}}"}}`)),
+	)
+
+	if err != nil {
+		// If custom styles fail, fall back to base renderer
+		return baseRenderer, nil
+	}
+
+	return renderer, nil
+}
+
+func NewModel(feedManager *feeds.Manager, taskManager tasks.Manager, queries *database.Queries, cfg config.Config) Model {
+	// Create glamour renderer based on theme
+	renderer, err := createGlamourRenderer(cfg.ThemeName)
 
 	if err != nil {
 		// Fallback to default renderer if creation fails
@@ -1210,7 +1244,7 @@ func (m Model) handleFeedListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// Reload URLs from file and sync with feeds
 		return m, reloadURLsFromFile(m.feedManager)
 
-	case "h", "?":
+	case "?":
 		m.previousState = m.state
 		m.state = HelpView
 		return m, nil
@@ -1547,7 +1581,7 @@ func (m Model) handleItemListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	switch msg.String() {
-	case "h", "?":
+	case "?":
 		m.previousState = m.state
 		m.state = HelpView
 		return m, nil
@@ -1565,12 +1599,14 @@ func (m Model) handleItemListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if len(m.itemList) > 0 && m.cursor < len(m.itemList)-1 {
 			m.cursor++
 			m.savedItemCursor = m.cursor
+			m.itemTitleScrollOffset = 0 // Reset horizontal scroll when moving to a new item
 		}
 
 	case "k", "up":
 		if len(m.itemList) > 0 && m.cursor > 0 {
 			m.cursor--
 			m.savedItemCursor = m.cursor
+			m.itemTitleScrollOffset = 0 // Reset horizontal scroll when moving to a new item
 		}
 
 	case "ctrl+d":
@@ -1581,6 +1617,7 @@ func (m Model) handleItemListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 			m.cursor = min(m.cursor+pageSize, len(m.itemList)-1)
 			m.savedItemCursor = m.cursor
+			m.itemTitleScrollOffset = 0 // Reset horizontal scroll when moving to a new item
 		}
 
 	case "ctrl+u":
@@ -1591,6 +1628,56 @@ func (m Model) handleItemListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 			m.cursor = max(m.cursor-pageSize, 0)
 			m.savedItemCursor = m.cursor
+			m.itemTitleScrollOffset = 0 // Reset horizontal scroll when moving to a new item
+		}
+
+	case "h", "left":
+		// Scroll title left (decrease offset)
+		if m.itemTitleScrollOffset > 0 {
+			m.itemTitleScrollOffset--
+		}
+
+	case "l", "right":
+		// Scroll title right (increase offset)
+		if len(m.itemList) > 0 && m.cursor < len(m.itemList) {
+			// Calculate max scroll based on title length
+			item := m.itemList[m.cursor]
+			titleLen := len(item.Title)
+			// Calculate the prefix length (date + space + read indicator)
+			prefixLen := 5 + 1 + 2 // "MM-DD" + space + read indicator
+			// Available width for title (leave some margin)
+			availableWidth := m.width - prefixLen - 5
+			if availableWidth < 10 {
+				availableWidth = 10
+			}
+			maxScroll := titleLen - availableWidth
+			if maxScroll < 0 {
+				maxScroll = 0
+			}
+			if m.itemTitleScrollOffset < maxScroll {
+				m.itemTitleScrollOffset++
+			}
+		}
+
+	case "0":
+		// Jump to beginning of title
+		m.itemTitleScrollOffset = 0
+
+	case "$":
+		// Jump to end of title
+		if len(m.itemList) > 0 && m.cursor < len(m.itemList) {
+			item := m.itemList[m.cursor]
+			titleLen := len(item.Title)
+			prefixLen := 5 + 1 + 2 // "MM-DD" + space + read indicator
+			availableWidth := m.width - prefixLen - 5
+			if availableWidth < 10 {
+				availableWidth = 10
+			}
+			maxScroll := titleLen - availableWidth
+			if maxScroll < 0 {
+				maxScroll = 0
+			}
+			m.itemTitleScrollOffset = maxScroll
 		}
 
 	case "enter":
@@ -1678,7 +1765,7 @@ func (m Model) handleItemListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m Model) handleArticleKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case "h", "?":
+	case "?":
 		m.previousState = m.state
 		m.state = HelpView
 		return m, nil
@@ -2067,7 +2154,6 @@ func (m Model) renderFeedList() string {
 
 	// Build status bar
 	viewKeys := GetViewKeys(FeedListView)
-	globalHelp := "h: help | q: quit"
 	viewHelp := FormatStatusBar(viewKeys.StatusBar)
 	var statusBarText string
 	if viewHelp != "" {
@@ -2460,7 +2546,18 @@ func (m Model) renderItemList() string {
 			readPrefix = "🔵"
 		}
 
-		line := datePrefix + " " + readPrefix + item.Title
+		// Apply horizontal scrolling to title if this is the selected item
+		title := item.Title
+		if i == m.cursor && m.itemTitleScrollOffset > 0 {
+			// Apply scroll offset to title only
+			if m.itemTitleScrollOffset < len(title) {
+				title = title[m.itemTitleScrollOffset:]
+			} else {
+				title = "" // Scrolled past the end
+			}
+		}
+
+		line := datePrefix + " " + readPrefix + title
 
 		// Apply highlighting
 		if i == m.cursor {
@@ -2638,7 +2735,7 @@ func (m Model) renderArticle() string {
 
 func (m Model) handleLogListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case "h", "?":
+	case "?":
 		m.previousState = m.state
 		m.state = HelpView
 		return m, nil
@@ -2698,7 +2795,7 @@ func (m Model) handleLogListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m Model) handleLogDetailKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case "h", "?":
+	case "?":
 		m.previousState = m.state
 		m.state = HelpView
 		return m, nil
@@ -2714,7 +2811,7 @@ func (m Model) handleLogDetailKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m Model) handleTasksViewKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case "h", "?":
+	case "?":
 		m.previousState = m.state
 		m.state = HelpView
 		return m, nil
@@ -3008,7 +3105,7 @@ func (m *Model) startNextBatchOfFeeds() tea.Cmd {
 
 func (m Model) handleHelpViewKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case "q", "esc", "h", "?", "ctrl+c":
+	case "q", "esc", "?", "ctrl+c":
 		// Return to previous view and reset scroll
 		m.state = m.previousState
 		m.helpViewScroll = 0
@@ -3082,6 +3179,10 @@ func (m Model) renderHelpView() string {
 	content.WriteString(fmt.Sprintf("  %-15s %s\n", "A", "Mark all items as read"))
 	content.WriteString(fmt.Sprintf("  %-15s %s\n", "/", "Global search (text of all feeds)"))
 	content.WriteString(fmt.Sprintf("  %-15s %s\n", "ctrl+f", "Title search only"))
+	content.WriteString(fmt.Sprintf("  %-15s %s\n", "h, left", "Scroll title left"))
+	content.WriteString(fmt.Sprintf("  %-15s %s\n", "l, right", "Scroll title right"))
+	content.WriteString(fmt.Sprintf("  %-15s %s\n", "0", "Jump to start of title"))
+	content.WriteString(fmt.Sprintf("  %-15s %s\n", "$", "Jump to end of title"))
 	content.WriteString(fmt.Sprintf("  %-15s %s\n", "N", "Toggle read status of item"))
 	content.WriteString(fmt.Sprintf("  %-15s %s\n", "o", "Open item link in browser"))
 	content.WriteString(fmt.Sprintf("  %-15s %s\n", "c", "View settings"))
@@ -3184,7 +3285,7 @@ func (m Model) renderHelpView() string {
 		b.WriteString(m.getHelpStyle().Render(scrollInfo))
 	}
 
-	b.WriteString(m.getHelpStyle().Render("j/k: scroll | esc/h: return"))
+	b.WriteString(m.getHelpStyle().Render("j/k: scroll | esc/?: return"))
 
 	return b.String()
 }
@@ -3334,11 +3435,7 @@ func (m Model) handleSettingsViewKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 
 			// Update glamour renderer
-			theme := themes.GetThemeByName(m.config.ThemeName)
-			renderer, err := glamour.NewTermRenderer(
-				glamour.WithStandardStyle(theme.GlamourStyle),
-				glamour.WithWordWrap(80),
-			)
+			renderer, err := createGlamourRenderer(m.config.ThemeName)
 			if err == nil {
 				m.glamourRenderer = renderer
 			}
@@ -3643,11 +3740,6 @@ func (m Model) handleSettingsViewKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	// Not editing - handle navigation
 	switch msg.String() {
-	case "h":
-		m.previousState = m.state
-		m.state = HelpView
-		return m, nil
-
 	case "?":
 		m.showSettingsHelp = !m.showSettingsHelp
 		return m, nil
@@ -4093,7 +4185,7 @@ func (m Model) renderSettingsView() string {
 
 func (m Model) handleFeedInfoKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case "h", "?":
+	case "?":
 		m.previousState = m.state
 		m.state = HelpView
 		m.helpViewScroll = 0
@@ -4181,7 +4273,6 @@ func (m Model) renderFeedInfo() string {
 
 	// Build status bar
 	viewKeys := GetViewKeys(FeedInfoView)
-	globalHelp := "h: help | q: quit"
 	viewHelp := FormatStatusBar(viewKeys.StatusBar)
 	var statusBarText string
 	if viewHelp != "" {

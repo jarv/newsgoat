@@ -69,6 +69,49 @@ func TestAddLinkMarkersToHTML(t *testing.T) {
 	}
 }
 
+func TestMarkdownRendering(t *testing.T) {
+	manager := &Manager{}
+
+	// Test the example from the user's request
+	html := `<p>Making peace with YouTube was a necessary step that contributed <a
+href="https://torrentfreak.com/youtube-processed-2-2-billion-content-id-copyright-claims-in-2024-250522/">billions
+of dollars</a> to the overall recovery. The turning point came in 2015, marking the start of ten consecutive
+years of growth. Revenues more than doubled, from a low of US$12.9 billion in 2014 to a high of US$29.6 billion
+in 2024.</p>`
+
+	// Add link markers
+	markedHTML, links := manager.AddLinkMarkersToHTML(html)
+
+	// Convert to markdown
+	markdown := manager.ConvertHTMLToMarkdown(markedHTML)
+
+	t.Logf("Original HTML:\n%s\n", html)
+	t.Logf("Marked HTML:\n%s\n", markedHTML)
+	t.Logf("Links found: %v\n", links)
+	t.Logf("Markdown output:\n%s\n", markdown)
+
+	// The intermediate markdown (before glamour rendering) should contain \[1\] (escaped) AND the URL
+	// because that's standard markdown format: [text](url)
+	// The [1] is escaped as \[1\] to prevent it from being interpreted as a link
+	if !strings.Contains(markdown, "\\[1\\]") && !strings.Contains(markdown, "[1]") {
+		t.Error("Markdown should contain [1] marker (escaped or not)")
+	}
+
+	// The markdown format should contain the URL - this is correct
+	// It will be hidden by glamour when rendered to the terminal
+	if !strings.Contains(markdown, "https://torrentfreak.com") {
+		t.Error("Markdown format should contain the URL (it will be hidden during rendering)")
+	}
+
+	// Verify we got the correct link
+	if len(links) != 1 {
+		t.Errorf("Expected 1 link, got %d", len(links))
+	}
+	if len(links) > 0 && links[0] != "https://torrentfreak.com/youtube-processed-2-2-billion-content-id-copyright-claims-in-2024-250522/" {
+		t.Errorf("Unexpected link: %s", links[0])
+	}
+}
+
 func TestExtractLinks(t *testing.T) {
 	manager := &Manager{}
 

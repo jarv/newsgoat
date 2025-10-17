@@ -272,7 +272,7 @@ Search filters results in real-time as you type, making it easy to find specific
 
 | Key | Description |
 |-----|-------------|
-| <kbd>h</kbd>, <kbd>?</kbd> | Show help |
+| <kbd>?</kbd> | Show help |
 | <kbd>q</kbd> | Go back / quit (press twice in feed view) |
 | <kbd>Esc</kbd> | Go back (does nothing in feed view) |
 | <kbd>Ctrl</kbd>+<kbd>C</kbd> | Go back / quit (press twice in feed view) |
@@ -306,6 +306,10 @@ Search filters results in real-time as you type, making it easy to find specific
 |-----|-------------|
 | <kbd>/</kbd> | Global search (all feed content) |
 | <kbd>Ctrl</kbd>+<kbd>F</kbd> | Title search only |
+| <kbd>h</kbd>, <kbd>←</kbd> | Scroll title left |
+| <kbd>l</kbd>, <kbd>→</kbd> | Scroll title right |
+| <kbd>0</kbd> | Jump to start of title |
+| <kbd>$</kbd> | Jump to end of title |
 | <kbd>r</kbd> | Refresh current feed |
 | <kbd>R</kbd> | Refresh all feeds |
 | <kbd>A</kbd> | Mark all items as read |
