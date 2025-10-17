@@ -12,7 +12,7 @@ It's inspired by [Newsbeuter](https://github.com/akrennmair/newsbeuter)/[Newsboa
 
 I’ve been using terminal-based RSS readers for about 15 years.
 The first program I used was [Newsbeuter](https://github.com/akrennmair/newsbeuter), but around 2017 its maintainer announced it would no longer be maintained, so I switched to its fork, [Newsboat](https://github.com/newsboat/newsboat).
-Over time, I grew frustrated with frequent crashes and started looking for alternatives. A similar CLI RSS reader written in Go called [nom](https://github.com/guyfedwards/nom) looked interesting, but it didn’t offer the feed organization I wanted.
+Over time, I grew frustrated with frequent crashes and started looking for alternatives. A similar terminal-based RSS reader written in Go called [nom](https://github.com/guyfedwards/nom) looked interesting, but it didn’t offer the feed organization I wanted.
 
 Meanwhile, “vibe coding” was catching on, and it seemed like a fun excuse to see how quickly I could build my own news reader in Go with exactly the features I wanted. After about a day of prompting, tweaking, and vibing through the process, here’s the result—enjoy!
 
@@ -54,11 +54,11 @@ This will extract the `channel_id` and subscribe to the channel RSS feed.
 
 ## Alternatives
 
-- The original CLI based newsreader [newsbeuter](https://github.com/akrennmair/newsbeuter).
+- The original terminal-based newsreader [newsbeuter](https://github.com/akrennmair/newsbeuter).
 - Newsbeuter was archived, and I think was forked as [newsboat](https://github.com/newsboat/newsboat) and re-written in Rust.
-- [nom](https://github.com/guyfedwards/nom) is a similar CLI based news reader (also written in Go).
+- [nom](https://github.com/guyfedwards/nom) is a similar terminal-based news reader (also written in Go).
 
-If you know of any other CLI based RSS readers worth mentioning here please add them!
+If you know of any other terminal-based RSS readers worth mentioning here please add them!
 
 ## Configure
 
