@@ -1,3 +1,11 @@
+## [1.11.1](https://github.com/jarv/newsgoat/compare/v1.11.0...v1.11.1) (2025-10-17)
+
+
+### Bug Fixes
+
+* Extend unread feed sorting to the Feed Items view ([75046d8](https://github.com/jarv/newsgoat/commit/75046d87ca6b5acec34b3757598146b60b510627))
+* Resolves permission error for the auto-updater ([af2934f](https://github.com/jarv/newsgoat/commit/af2934f2ee9217b386855bb128c0b4b0875b5e0f))
+
 # [1.11.0](https://github.com/jarv/newsgoat/compare/v1.10.2...v1.11.0) (2025-10-17)
 
 
