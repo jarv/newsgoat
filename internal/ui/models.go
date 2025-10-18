@@ -1982,7 +1982,12 @@ func (m Model) getSelectedStyle() lipgloss.Style {
 	case "background":
 		fallthrough
 	default:
-		return lipgloss.NewStyle().Background(lipgloss.Color(theme.SelectedItemColor)).Foreground(lipgloss.Color("229"))
+		// Use blue background for dracula theme, otherwise use theme's selected color
+		bgColor := theme.SelectedItemColor
+		if theme.Name == "dracula" {
+			bgColor = "#6272a4" // Dracula blue
+		}
+		return lipgloss.NewStyle().Background(lipgloss.Color(bgColor)).Foreground(lipgloss.Color("229"))
 	}
 }
 
