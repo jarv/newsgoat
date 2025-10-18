@@ -1,3 +1,10 @@
+## [1.11.4](https://github.com/jarv/newsgoat/compare/v1.11.3...v1.11.4) (2025-10-18)
+
+
+### Bug Fixes
+
+* Instead of a binary rename, copy the binary for updates ([eb7723b](https://github.com/jarv/newsgoat/commit/eb7723bad8e5940ec3c422580554ea5e4500dceb))
+
 ## [1.11.3](https://github.com/jarv/newsgoat/compare/v1.11.2...v1.11.3) (2025-10-18)
 
 
