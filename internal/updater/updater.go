@@ -216,19 +216,13 @@ func DownloadAndInstall(downloadURL string) error {
 
 	logging.Debug("Set executable permissions on temp file")
 
-	// Create backup in temp directory (not in binary's directory which may require elevated permissions)
+	// Create backup in temp directory by copying the current binary
+	// We use copy instead of rename because we may not have permission to rename/remove from /usr/local/bin
 	backupFile, err := os.CreateTemp("", "newsgoat-backup-*")
 	if err != nil {
 		return fmt.Errorf("failed to create backup temp file: %w", err)
 	}
 	backupPath := backupFile.Name()
-	if closeErr := backupFile.Close(); closeErr != nil {
-		return fmt.Errorf("failed to close backup temp file: %w", closeErr)
-	}
-	// Remove the empty temp file so we can rename the binary to it
-	if removeErr := os.Remove(backupPath); removeErr != nil {
-		return fmt.Errorf("failed to remove backup temp file: %w", removeErr)
-	}
 
 	defer func() {
 		if removeErr := os.Remove(backupPath); removeErr != nil {
@@ -238,18 +232,45 @@ func DownloadAndInstall(downloadURL string) error {
 
 	logging.Debug("Backing up current binary", "from", execPath, "to", backupPath)
 
-	if err := os.Rename(execPath, backupPath); err != nil {
-		return fmt.Errorf("failed to backup current binary: %w", err)
+	// Copy current binary to backup
+	currentFile, err := os.Open(execPath)
+	if err != nil {
+		return fmt.Errorf("failed to open current binary for backup: %w", err)
+	}
+	_, err = io.Copy(backupFile, currentFile)
+	if closeErr := currentFile.Close(); closeErr != nil {
+		logging.Debug("Failed to close current binary file", "path", execPath, "error", closeErr)
+	}
+	if closeErr := backupFile.Close(); closeErr != nil {
+		return fmt.Errorf("failed to close backup file: %w", closeErr)
+	}
+	if err != nil {
+		return fmt.Errorf("failed to copy current binary to backup: %w", err)
 	}
 
-	// Move new binary to current location
+	logging.Debug("Created backup of current binary")
+
+	// Copy new binary to current location (overwriting the existing file)
 	logging.Info("Installing new binary", "from", tmpPath, "to", execPath)
 
-	if err := os.Rename(tmpPath, execPath); err != nil {
-		// Restore backup if move fails
+	// Read the new binary
+	newBinary, err := os.ReadFile(tmpPath)
+	if err != nil {
+		return fmt.Errorf("failed to read new binary: %w", err)
+	}
+
+	// Write to the current location (this overwrites the file)
+	if err := os.WriteFile(execPath, newBinary, 0755); err != nil {
+		// Restore backup if installation fails
 		logging.Error("Failed to install update, restoring backup", "error", err)
-		if restoreErr := os.Rename(backupPath, execPath); restoreErr != nil {
+		backupData, readErr := os.ReadFile(backupPath)
+		if readErr != nil {
+			logging.Error("Failed to read backup file", "error", readErr)
+			return fmt.Errorf("failed to install update and restore backup: %w", err)
+		}
+		if restoreErr := os.WriteFile(execPath, backupData, 0755); restoreErr != nil {
 			logging.Error("Failed to restore backup", "error", restoreErr)
+			return fmt.Errorf("failed to install update and restore backup: %w", err)
 		}
 		return fmt.Errorf("failed to install update: %w", err)
 	}
