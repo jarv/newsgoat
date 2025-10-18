@@ -1,3 +1,10 @@
+## [1.11.2](https://github.com/jarv/newsgoat/compare/v1.11.1...v1.11.2) (2025-10-18)
+
+
+### Bug Fixes
+
+* Removes 🔵 for unread items ([7409982](https://github.com/jarv/newsgoat/commit/740998211ea4bed5899eed38359edd56b8dc96c0))
+
 ## [1.11.1](https://github.com/jarv/newsgoat/compare/v1.11.0...v1.11.1) (2025-10-17)
 
 
