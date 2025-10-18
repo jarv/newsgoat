@@ -2356,10 +2356,6 @@ func (m Model) renderFeedList() string {
 				} else {
 					statusEmoji = "❌" // Generic error
 				}
-			} else if feed.UnreadItems > 0 {
-				statusEmoji = "🔵" // Unread items
-			} else {
-				statusEmoji = "  " // All read - two spaces to align with emoji width
 			}
 
 			// Spinner - 2 character space reserved for spinner when refreshing
@@ -2386,7 +2382,7 @@ func (m Model) renderFeedList() string {
 				prefix = ""
 			}
 
-			// Construct the line: prefix + status (emoji or 2 spaces) + spinner (2 chars) + count (9 chars) + space + feed title
+			// Construct the line: prefix + status emoji (if error) + spinner (2 chars) + count (9 chars) + space + feed title
 			line = prefix + statusEmoji + spinner + paddedCount + " " + displayTitle
 
 			// Apply highlighting
@@ -2563,11 +2559,6 @@ func (m Model) renderItemList() string {
 			datePrefix = item.Published.Time.Format("01-02")
 		}
 
-		readPrefix := "  "
-		if !item.Read {
-			readPrefix = "🔵"
-		}
-
 		// Apply horizontal scrolling to title if this is the selected item
 		title := item.Title
 		if i == m.cursor && m.itemTitleScrollOffset > 0 {
@@ -2579,7 +2570,7 @@ func (m Model) renderItemList() string {
 			}
 		}
 
-		line := datePrefix + " " + readPrefix + title
+		line := datePrefix + " " + title
 
 		// Apply highlighting
 		if i == m.cursor {
@@ -3241,7 +3232,6 @@ func (m Model) renderHelpView() string {
 
 	// Status icons legend - unified section
 	content.WriteString("Status Icons\n")
-	content.WriteString("  🔵              Unread items/feed\n")
 	content.WriteString("  🔍              404 Not Found\n")
 	content.WriteString("  🚫              403 Forbidden\n")
 	content.WriteString("  ⏱️              429 Too Many Requests\n")

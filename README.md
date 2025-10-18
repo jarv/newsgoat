@@ -357,7 +357,6 @@ Search filters results in real-time as you type, making it easy to find specific
 |------|---------|
 | 📁 | Closed folder |
 | 📂 | Open folder |
-| 🔵 | Unread items/feed |
 | 🔍 | 404 Not Found |
 | 🚫 | 403 Forbidden |
 | ⏱️ | 429 Too Many Requests |
