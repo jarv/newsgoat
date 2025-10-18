@@ -1,3 +1,10 @@
+## [1.11.3](https://github.com/jarv/newsgoat/compare/v1.11.2...v1.11.3) (2025-10-18)
+
+
+### Bug Fixes
+
+* Use blue for the background selector for the Dracula theme ([7871b8d](https://github.com/jarv/newsgoat/commit/7871b8db0b5f22c27bc0bccadde7ea9cd9be8a3b))
+
 ## [1.11.2](https://github.com/jarv/newsgoat/compare/v1.11.1...v1.11.2) (2025-10-18)
 
 
