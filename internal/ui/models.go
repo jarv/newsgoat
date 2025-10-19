@@ -2342,7 +2342,7 @@ func (m Model) renderFeedList() string {
 			// Render feed
 			feed := *item.Feed
 
-			// Status emoji: error emoji if error (but not when refreshing), unread if has unread items, nothing if all read
+			// Status emoji: error emoji if error (but not when refreshing), 'N' if unread, space if read
 			var statusEmoji string
 			// Don't show error emoji when actively refreshing - let the spinner show instead
 			if feed.LastError.Valid && feed.LastError.String != "" && !m.refreshingFeeds[feed.ID] {
@@ -2361,6 +2361,10 @@ func (m Model) renderFeedList() string {
 				} else {
 					statusEmoji = "❌" // Generic error
 				}
+			} else if feed.UnreadItems > 0 {
+				statusEmoji = "N " // Unread items - extra space to match emoji width
+			} else {
+				statusEmoji = "  " // All read - two spaces to match emoji width
 			}
 
 			// Spinner - 2 character space reserved for spinner when refreshing
@@ -2564,6 +2568,12 @@ func (m Model) renderItemList() string {
 			datePrefix = item.Published.Time.Format("01-02")
 		}
 
+		// Unread indicator: 'N' for unread, space for read
+		readPrefix := " "
+		if !item.Read {
+			readPrefix = "N"
+		}
+
 		// Apply horizontal scrolling to title if this is the selected item
 		title := item.Title
 		if i == m.cursor && m.itemTitleScrollOffset > 0 {
@@ -2575,7 +2585,7 @@ func (m Model) renderItemList() string {
 			}
 		}
 
-		line := datePrefix + " " + title
+		line := datePrefix + " " + readPrefix + " " + title
 
 		// Apply highlighting
 		if i == m.cursor {
