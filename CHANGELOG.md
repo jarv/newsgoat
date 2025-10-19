@@ -1,3 +1,10 @@
+## [1.11.5](https://github.com/jarv/newsgoat/compare/v1.11.4...v1.11.5) (2025-10-19)
+
+
+### Bug Fixes
+
+* Adds the unread indicator back but instead use 'N' ([400505a](https://github.com/jarv/newsgoat/commit/400505a8dea0545bcb974b4c995abafbf041a736))
+
 ## [1.11.4](https://github.com/jarv/newsgoat/compare/v1.11.3...v1.11.4) (2025-10-18)
 
 
