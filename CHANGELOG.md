@@ -1,3 +1,11 @@
+## [1.11.6](https://github.com/jarv/newsgoat/compare/v1.11.5...v1.11.6) (2025-10-20)
+
+
+### Bug Fixes
+
+* Fixes non-html feed formatting (youtube) ([55703db](https://github.com/jarv/newsgoat/commit/55703dbd09f87a188fbf192ca6bc193721ea88ac))
+* Reverts sort order for unread items on top for feed items ([bdab480](https://github.com/jarv/newsgoat/commit/bdab480dccf2b44c535e41f946c0187b862970a8))
+
 ## [1.11.5](https://github.com/jarv/newsgoat/compare/v1.11.4...v1.11.5) (2025-10-19)
 
 
