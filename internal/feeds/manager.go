@@ -462,6 +462,13 @@ func (m *Manager) GetFeedStats() ([]database.GetFeedStatsRow, error) {
 	return result, err
 }
 
+func (m *Manager) GetFeed(feedID int64) (database.Feed, error) {
+	m.dbMutex.RLock()
+	feed, err := m.queries.GetFeed(context.Background(), feedID)
+	m.dbMutex.RUnlock()
+	return feed, err
+}
+
 func (m *Manager) GetItemsWithReadStatus(feedID int64) ([]database.GetItemsWithReadStatusRow, error) {
 	m.dbMutex.RLock()
 	result, err := m.queries.GetItemsWithReadStatus(context.Background(), feedID)

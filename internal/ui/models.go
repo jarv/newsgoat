@@ -2626,6 +2626,35 @@ func (m *Model) getArticleContentLines() []string {
 	// Build content
 	var contentBuilder strings.Builder
 
+	// Get feed information for the header
+	feed, err := m.feedManager.GetFeed(m.currentItem.FeedID)
+	var feedTitle string
+	if err != nil {
+		feedTitle = "Unknown Feed"
+	} else {
+		feedTitle = feed.Title
+	}
+
+	// Create subtle gray style for header
+	headerStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
+
+	// Build header section with subtle gray text
+	contentBuilder.WriteString(headerStyle.Render("Feed: " + feedTitle) + "\n")
+	contentBuilder.WriteString(headerStyle.Render("Title: " + m.currentItem.Title) + "\n")
+
+	// Add date if available
+	if m.currentItem.Published.Valid {
+		dateStr := m.currentItem.Published.Time.Format("2006-01-02 15:04")
+		contentBuilder.WriteString(headerStyle.Render("Date: " + dateStr) + "\n")
+	}
+
+	// Add link if available
+	if m.currentItem.Link != "" {
+		contentBuilder.WriteString(headerStyle.Render("Link: " + m.currentItem.Link) + "\n")
+	}
+
+	contentBuilder.WriteString("\n") // Empty line after header
+
 	content := m.currentItem.Content
 	if content == "" {
 		content = m.currentItem.Description
@@ -2681,7 +2710,7 @@ func (m *Model) getArticleContentLines() []string {
 		contentBuilder.WriteString(m.getHelpStyle().Render("Links:"))
 		contentBuilder.WriteString("\n")
 		for i, link := range m.links {
-			contentBuilder.WriteString(fmt.Sprintf("[%d] %s\n", i+1, link))
+			contentBuilder.WriteString(fmt.Sprintf("[%d]: %s\n", i+1, link))
 		}
 	}
 
