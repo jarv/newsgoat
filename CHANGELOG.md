@@ -1,3 +1,10 @@
+## [1.11.7](https://github.com/jarv/newsgoat/compare/v1.11.6...v1.11.7) (2025-10-20)
+
+
+### Bug Fixes
+
+* Formatting improvements to the article view ([f8a51ad](https://github.com/jarv/newsgoat/commit/f8a51ad34a0c808f5669f68a514238c9de985fb0))
+
 ## [1.11.6](https://github.com/jarv/newsgoat/compare/v1.11.5...v1.11.6) (2025-10-20)
 
 
