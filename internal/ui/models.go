@@ -2655,12 +2655,16 @@ func (m *Model) getArticleContentLines() []string {
 		return wrappedLines
 	}
 
-	// Add link markers to HTML BEFORE converting to markdown
-	// This ensures the markers are properly preserved during conversion
-	content, _ = m.feedManager.AddLinkMarkersToHTML(content)
+	// Only process HTML content through html-to-markdown conversion
+	// Plain text content (like YouTube's media:description) should skip this step
+	if feeds.IsHTML(content) {
+		// Add link markers to HTML BEFORE converting to markdown
+		// This ensures the markers are properly preserved during conversion
+		content, _ = m.feedManager.AddLinkMarkersToHTML(content)
 
-	// Convert HTML to markdown
-	content = m.feedManager.ConvertHTMLToMarkdown(content)
+		// Convert HTML to markdown
+		content = m.feedManager.ConvertHTMLToMarkdown(content)
+	}
 
 	// Render markdown content using glamour
 	if m.glamourRenderer != nil {

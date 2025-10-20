@@ -162,3 +162,71 @@ func TestExtractLinks(t *testing.T) {
 		})
 	}
 }
+
+func TestIsHTML(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected bool
+	}{
+		{
+			name:     "HTML with p tags",
+			input:    "<p>This is HTML</p>",
+			expected: true,
+		},
+		{
+			name:     "HTML with div tags",
+			input:    "<div>This is HTML</div>",
+			expected: true,
+		},
+		{
+			name:     "HTML with anchor tags",
+			input:    `Check out <a href="https://example.com">this link</a>`,
+			expected: true,
+		},
+		{
+			name:     "HTML with br tags",
+			input:    "Line 1<br>Line 2",
+			expected: true,
+		},
+		{
+			name:     "Plain text without HTML",
+			input:    "This is plain text without any HTML tags",
+			expected: false,
+		},
+		{
+			name:     "Plain text with URL",
+			input:    "Check out https://example.com for more info",
+			expected: false,
+		},
+		{
+			name:     "Plain text with angle brackets but not HTML",
+			input:    "The value is < 10 and > 5",
+			expected: false,
+		},
+		{
+			name:     "YouTube-style plain text description",
+			input:    "This is a video about programming.\n\nLinks:\nhttps://example.com\nhttps://github.com",
+			expected: false,
+		},
+		{
+			name:     "Empty string",
+			input:    "",
+			expected: false,
+		},
+		{
+			name:     "HTML with newlines",
+			input:    "<p>\nMultiline\nHTML\n</p>",
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := IsHTML(tt.input)
+			if result != tt.expected {
+				t.Errorf("IsHTML(%q) = %v, expected %v", tt.input, result, tt.expected)
+			}
+		})
+	}
+}

@@ -96,6 +96,17 @@ func parseCacheControl(cacheControl string) (maxAge int64, hasMaxAge bool) {
 	return 0, false
 }
 
+// IsHTML checks if the input string contains HTML tags
+func IsHTML(input string) bool {
+	if input == "" {
+		return false
+	}
+	// Check for common HTML patterns
+	// Look for opening HTML tags like <p>, <div>, <a>, <br>, etc.
+	htmlTagPattern := regexp.MustCompile(`<[a-zA-Z][^>]*>`)
+	return htmlTagPattern.MatchString(input)
+}
+
 func (m *Manager) ConvertHTMLToMarkdown(input string) string {
 	if input == "" {
 		return ""
