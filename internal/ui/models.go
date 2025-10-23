@@ -2156,7 +2156,7 @@ func (m *Model) buildFeedDisplayList(feeds []database.GetFeedStatsRow) {
 
 func (m Model) renderFeedList() string {
 	var b strings.Builder
-	b.WriteString(m.getTitleStyle().Render("🐐 NewsGoat " + version.GetVersion() + " - RSS Reader"))
+	b.WriteString(m.getTitleStyle().Render("🐐 NewsGoat " + version.GetVersion()))
 
 	if m.refreshing {
 		b.WriteString(" - ")
@@ -2464,7 +2464,26 @@ func (m Model) renderFeedList() string {
 
 func (m Model) renderItemList() string {
 	var b strings.Builder
-	b.WriteString(m.getTitleStyle().Render("🐐 NewsGoat - Feed Items"))
+
+	// Get the feed name for the title
+	var titleText string
+	if m.selectedFeed != 0 {
+		feed, err := m.feedManager.GetFeed(m.selectedFeed)
+		if err != nil {
+			titleText = "🐐 NewsGoat - Feed Items"
+		} else {
+			// Convert to GetFeedStatsRow for getDisplayTitle
+			feedStats := database.GetFeedStatsRow{
+				Url:   feed.Url,
+				Title: feed.Title,
+			}
+			titleText = "🐐 NewsGoat - " + getDisplayTitle(feedStats)
+		}
+	} else {
+		titleText = "🐐 NewsGoat - Feed Items"
+	}
+
+	b.WriteString(m.getTitleStyle().Render(titleText))
 
 	if m.refreshing {
 		b.WriteString(" - ")
@@ -2639,18 +2658,18 @@ func (m *Model) getArticleContentLines() []string {
 	headerStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
 
 	// Build header section with subtle gray text
-	contentBuilder.WriteString(headerStyle.Render("Feed: " + feedTitle) + "\n")
-	contentBuilder.WriteString(headerStyle.Render("Title: " + m.currentItem.Title) + "\n")
+	contentBuilder.WriteString(headerStyle.Render("Feed: "+feedTitle) + "\n")
+	contentBuilder.WriteString(headerStyle.Render("Title: "+m.currentItem.Title) + "\n")
 
 	// Add date if available
 	if m.currentItem.Published.Valid {
 		dateStr := m.currentItem.Published.Time.Format("2006-01-02 15:04")
-		contentBuilder.WriteString(headerStyle.Render("Date: " + dateStr) + "\n")
+		contentBuilder.WriteString(headerStyle.Render("Date: "+dateStr) + "\n")
 	}
 
 	// Add link if available
 	if m.currentItem.Link != "" {
-		contentBuilder.WriteString(headerStyle.Render("Link: " + m.currentItem.Link) + "\n")
+		contentBuilder.WriteString(headerStyle.Render("Link: "+m.currentItem.Link) + "\n")
 	}
 
 	contentBuilder.WriteString("\n") // Empty line after header
