@@ -1,3 +1,10 @@
+## [1.11.9](https://github.com/jarv/newsgoat/compare/v1.11.8...v1.11.9) (2025-10-31)
+
+
+### Bug Fixes
+
+* Adds feed title to the item list ([aec02af](https://github.com/jarv/newsgoat/commit/aec02afafa08674b7698d310ae145b9e44e43b91))
+
 ## [1.11.8](https://github.com/jarv/newsgoat/compare/v1.11.7...v1.11.8) (2025-10-30)
 
 
