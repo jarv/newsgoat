@@ -98,6 +98,8 @@ github.com/muesli/termenv v0.16.0 h1:S5AlUN9dENB57rsbnkPyfdGuWIlkmzJjbFf0Tf5FWUc
 github.com/muesli/termenv v0.16.0/go.mod h1:ZRfOIKPFDYQoDFF4Olj7/QJbW60Ol/kL1pU3VfY/Cnk=
 github.com/ncruces/go-sqlite3 v0.29.1 h1:NIi8AISWBToRHyoz01FXiTNvU147Tqdibgj2tFzJCqM=
 github.com/ncruces/go-sqlite3 v0.29.1/go.mod h1:PpccBNNhvjwUOwDQEn2gXQPFPTWdlromj0+fSkd5KSg=
+github.com/ncruces/go-sqlite3 v0.30.0 h1:EcoP5wtm8lRfRGQmOI782t/matUvzpqI3om9rTDngQ8=
+github.com/ncruces/go-sqlite3 v0.30.0/go.mod h1:6mcRKUuA9qvAo7PcQU+wwcT2j/qGimg1qXO/pmj8Ryk=
 github.com/ncruces/julianday v1.0.0 h1:fH0OKwa7NWvniGQtxdJRxAgkBMolni2BjDHaWTxqt7M=
 github.com/ncruces/julianday v1.0.0/go.mod h1:Dusn2KvZrrovOMJuOt0TNXL6tB7U2E8kvza5fFc9G7g=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
