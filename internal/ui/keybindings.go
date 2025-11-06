@@ -40,6 +40,7 @@ var FeedListViewKeys = ViewKeyBindings{
 var ItemListViewKeys = ViewKeyBindings{
 	AllowedKeys: []string{"r", "R", "A", "/", "ctrl+f", "h", "l", "left", "right", "0", "$"},
 	StatusBar: []KeyBinding{
+		{"o", "open"},
 		{"/", "search"},
 		{"r/R", "reload"},
 		{"h/l, ←/→, 0/$", "navigate title"},
@@ -49,6 +50,7 @@ var ItemListViewKeys = ViewKeyBindings{
 var ArticleViewKeys = ViewKeyBindings{
 	AllowedKeys: []string{"1", "2", "3", "4", "5", "6", "7", "8", "9", "n", "N", "o", "r"},
 	StatusBar: []KeyBinding{
+		{"o", "open"},
 		{"n/N", "next/prev"},
 	}, // No custom status bar for article view
 }
