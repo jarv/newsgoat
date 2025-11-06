@@ -1,3 +1,10 @@
+## [1.11.12](https://github.com/jarv/newsgoat/compare/v1.11.11...v1.11.12) (2025-11-06)
+
+
+### Bug Fixes
+
+* Adds 'o' for open to help text ([dccae9f](https://github.com/jarv/newsgoat/commit/dccae9fec089bcc8d327c1393db332e5e314536c))
+
 ## [1.11.11](https://github.com/jarv/newsgoat/compare/v1.11.10...v1.11.11) (2025-11-05)
 
 
