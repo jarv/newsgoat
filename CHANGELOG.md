@@ -1,3 +1,10 @@
+## [1.11.14](https://github.com/jarv/newsgoat/compare/v1.11.13...v1.11.14) (2025-11-11)
+
+
+### Bug Fixes
+
+* **deps:** update module golang.org/x/net to v0.47.0 ([#43](https://github.com/jarv/newsgoat/issues/43)) ([aff87c9](https://github.com/jarv/newsgoat/commit/aff87c973c58b53c769b780d2fe21c6ba19d6ba8))
+
 ## [1.11.13](https://github.com/jarv/newsgoat/compare/v1.11.12...v1.11.13) (2025-11-09)
 
 
