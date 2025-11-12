@@ -2,6 +2,7 @@ package ui
 
 import (
 	"context"
+	"os"
 	"os/exec"
 	"runtime"
 	"strings"
@@ -17,7 +18,7 @@ import (
 	"github.com/jarv/newsgoat/internal/updater"
 )
 
-func loadFeedList(feedManager *feeds.Manager) tea.Cmd {
+func loadFeedList(feedManager feeds.FeedManager) tea.Cmd {
 	return func() tea.Msg {
 		feeds, err := feedManager.GetFeedStats()
 		if err != nil {
@@ -28,7 +29,7 @@ func loadFeedList(feedManager *feeds.Manager) tea.Cmd {
 	}
 }
 
-func loadItemList(feedManager *feeds.Manager, feedID int64) tea.Cmd {
+func loadItemList(feedManager feeds.FeedManager, feedID int64) tea.Cmd {
 	return func() tea.Msg {
 		items, err := feedManager.GetItemsWithReadStatus(feedID)
 		if err != nil {
@@ -39,7 +40,7 @@ func loadItemList(feedManager *feeds.Manager, feedID int64) tea.Cmd {
 	}
 }
 
-func loadLogList(feedManager *feeds.Manager) tea.Cmd {
+func loadLogList(feedManager feeds.FeedManager) tea.Cmd {
 	return func() tea.Msg {
 		logs, err := feedManager.GetLogMessages(1000) // Get last 1000 log messages
 		if err != nil {
@@ -93,7 +94,7 @@ func removeTask(taskManager tasks.Manager, taskID string) tea.Cmd {
 	}
 }
 
-func clearAllLogMessages(feedManager *feeds.Manager) tea.Cmd {
+func clearAllLogMessages(feedManager feeds.FeedManager) tea.Cmd {
 	return func() tea.Msg {
 		err := feedManager.DeleteAllLogMessages()
 		if err != nil {
@@ -105,7 +106,7 @@ func clearAllLogMessages(feedManager *feeds.Manager) tea.Cmd {
 	}
 }
 
-func refreshFeedAndReload(feedManager *feeds.Manager, feedID int64) tea.Cmd {
+func refreshFeedAndReload(feedManager feeds.FeedManager, feedID int64) tea.Cmd {
 	return func() tea.Msg {
 		err := feedManager.RefreshFeed(feedID)
 		if err != nil {
@@ -116,13 +117,13 @@ func refreshFeedAndReload(feedManager *feeds.Manager, feedID int64) tea.Cmd {
 	}
 }
 
-func refreshAllFeedsConcurrent(feedManager *feeds.Manager) tea.Cmd {
+func refreshAllFeedsConcurrent(feedManager feeds.FeedManager) tea.Cmd {
 	return func() tea.Msg {
 		return RefreshAllStartMsg{}
 	}
 }
 
-func markItemRead(feedManager *feeds.Manager, itemID int64) tea.Cmd {
+func markItemRead(feedManager feeds.FeedManager, itemID int64) tea.Cmd {
 	return func() tea.Msg {
 		err := feedManager.MarkItemRead(itemID)
 		if err != nil {
@@ -132,7 +133,7 @@ func markItemRead(feedManager *feeds.Manager, itemID int64) tea.Cmd {
 	}
 }
 
-func markAllItemsReadInFeed(feedManager *feeds.Manager, feedID int64) tea.Cmd {
+func markAllItemsReadInFeed(feedManager feeds.FeedManager, feedID int64) tea.Cmd {
 	return func() tea.Msg {
 		err := feedManager.MarkAllItemsReadInFeed(feedID)
 		if err != nil {
@@ -143,7 +144,7 @@ func markAllItemsReadInFeed(feedManager *feeds.Manager, feedID int64) tea.Cmd {
 	}
 }
 
-func markAllItemsReadInFolder(feedManager *feeds.Manager, queries *database.Queries, folderName string) tea.Cmd {
+func markAllItemsReadInFolder(feedManager feeds.FeedManager, queries *database.Queries, folderName string) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
 
@@ -179,7 +180,7 @@ func markAllItemsReadInFolder(feedManager *feeds.Manager, queries *database.Quer
 	}
 }
 
-func toggleItemReadStatus(feedManager *feeds.Manager, itemID int64, currentlyRead bool) tea.Cmd {
+func toggleItemReadStatus(feedManager feeds.FeedManager, itemID int64, currentlyRead bool) tea.Cmd {
 	return func() tea.Msg {
 		var err error
 		if currentlyRead {
@@ -275,22 +276,7 @@ func loadFeedInfo(queries *database.Queries, feedID int64) tea.Cmd {
 	}
 }
 
-func reloadURLsFromFile(feedManager *feeds.Manager) tea.Cmd {
-	return func() tea.Msg {
-		urls, err := config.ReadURLsFile()
-		if err != nil {
-			logging.Error("reloadURLsFromFile failed", "error", err)
-			return ErrorMsg{Err: err}
-		}
-		urlsPath, pathErr := config.GetURLsFilePath()
-		if pathErr != nil {
-			urlsPath = ""
-		}
-		return URLsReloadedMsg{URLs: urls, FilePath: urlsPath}
-	}
-}
-
-func openURLsFileInEditor() tea.Cmd {
+func openURLsFileInEditor(feedManager feeds.FeedManager, queries *database.Queries) tea.Cmd {
 	editor := config.GetEditor()
 	if editor == "" {
 		return func() tea.Msg {
@@ -298,26 +284,60 @@ func openURLsFileInEditor() tea.Cmd {
 		}
 	}
 
-	urlsPath, err := config.GetURLsFilePath()
-	if err != nil {
-		logging.Error("openURLsFileInEditor: failed to get URLs file path", "error", err)
-		return func() tea.Msg {
-			return EditorErrorMsg{Err: "Failed to get URLs file path: " + err.Error()}
-		}
-	}
+	return func() tea.Msg {
+		ctx := context.Background()
 
-	c := exec.Command(editor, urlsPath)
-	return tea.ExecProcess(c, func(err error) tea.Msg {
+		// Get all feeds from database
+		allFeeds, err := feedManager.GetAllFeeds()
 		if err != nil {
-			logging.Error("openURLsFileInEditor: editor command failed", "editor", editor, "error", err)
-			return EditorErrorMsg{Err: "Failed to open editor: " + err.Error()}
+			logging.Error("openURLsFileInEditor: failed to get feeds", "error", err)
+			return EditorErrorMsg{Err: "Failed to get feeds from database: " + err.Error()}
 		}
-		return EditorFinishedMsg{}
-	})
+
+		// Build list of feeds with folders for temp file
+		var feedsWithFolders []config.FeedWithFolders
+		for _, feed := range allFeeds {
+			// Only export visible feeds
+			if !feed.Visible {
+				continue
+			}
+
+			// Get folders for this feed
+			folders, err := queries.GetFeedFolders(ctx, feed.ID)
+			if err != nil {
+				logging.Warn("Failed to get folders for feed", "feedID", feed.ID, "error", err)
+				folders = []string{} // Continue with empty folders
+			}
+
+			feedsWithFolders = append(feedsWithFolders, config.FeedWithFolders{
+				URL:     feed.Url,
+				Folders: folders,
+			})
+		}
+
+		// Create temp file with feeds
+		tempPath, err := config.ExportURLsToTempFile(feedsWithFolders)
+		if err != nil {
+			logging.Error("openURLsFileInEditor: failed to create temp file", "error", err)
+			return EditorErrorMsg{Err: "Failed to create temp file: " + err.Error()}
+		}
+
+		// Open editor with temp file
+		c := exec.Command(editor, tempPath)
+		return tea.ExecProcess(c, func(err error) tea.Msg {
+			if err != nil {
+				logging.Error("openURLsFileInEditor: editor command failed", "editor", editor, "error", err)
+				return EditorErrorMsg{Err: "Failed to open editor: " + err.Error()}
+			}
+			return EditorFinishedMsg{TempFilePath: tempPath}
+		})()
+	}
 }
 
-func addURLAndDiscover(feedManager *feeds.Manager, input string) tea.Cmd {
+func addURLAndDiscover(feedManager feeds.FeedManager, queries *database.Queries, input string) tea.Cmd {
 	return func() tea.Msg {
+		ctx := context.Background()
+
 		// Parse input: URL followed by optional folders
 		// Format: <url> folder1,folder2 or <url> "folder with spaces",folder3
 		parts := strings.Fields(input)
@@ -338,30 +358,53 @@ func addURLAndDiscover(feedManager *feeds.Manager, input string) tea.Cmd {
 			return URLAddErrorMsg{Err: "Failed to discover feed: " + err.Error()}
 		}
 
-		// Build the full line to add to URLs file
-		var fullLine string
-		if folderStr != "" {
-			fullLine = feedURL + " " + folderStr
-		} else {
-			fullLine = feedURL
-		}
-
-		// Add the URL with folders to the URLs file
-		if err := config.AddURLLine(fullLine); err != nil {
-			return URLAddErrorMsg{Err: "Failed to add URL to file: " + err.Error()}
-		}
-
 		// Add feed to database without fetching
 		if err := feedManager.AddFeedWithoutFetching(feedURL); err != nil {
-			// If it already exists, that's okay
+			// If it already exists, that's okay - we'll still update folders
 			logging.Warn("Feed may already exist", "url", feedURL, "error", err)
+		}
+
+		// Parse folders if provided
+		if folderStr != "" {
+			// Parse the folder string to handle quoted folders
+			parts := strings.Fields(folderStr)
+			if len(parts) > 0 {
+				// Join remaining parts to get the full folder spec
+				fullSpec := strings.Join(parts, " ")
+				// Create a URLEntry to parse folders
+				entry := config.URLEntry{
+					URL:     feedURL,
+					Folders: config.ParseFolders(fullSpec),
+				}
+
+				// Get the feed from database
+				feed, err := queries.GetFeedByURL(ctx, feedURL)
+				if err != nil {
+					logging.Warn("Failed to get feed for folder update", "url", feedURL, "error", err)
+				} else {
+					// Delete existing folders
+					if err := queries.DeleteFeedFolders(ctx, feed.ID); err != nil {
+						logging.Warn("Failed to delete old folders", "feed_id", feed.ID, "error", err)
+					}
+
+					// Add new folders
+					for _, folder := range entry.Folders {
+						if err := queries.AddFeedFolder(ctx, database.AddFeedFolderParams{
+							FeedID:     feed.ID,
+							FolderName: folder,
+						}); err != nil {
+							logging.Warn("Failed to add folder", "feed_id", feed.ID, "folder", folder, "error", err)
+						}
+					}
+				}
+			}
 		}
 
 		return URLAddSuccessMsg{URL: feedURL, DiscoveredURL: feedURL != urlArg}
 	}
 }
 
-func syncFeedsWithURLs(feedManager *feeds.Manager, queries *database.Queries, urlEntries []config.URLEntry) tea.Cmd {
+func syncFeedsWithURLs(feedManager feeds.FeedManager, queries *database.Queries, urlEntries []config.URLEntry) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
 
@@ -446,7 +489,27 @@ func syncFeedsWithURLs(feedManager *feeds.Manager, queries *database.Queries, ur
 	}
 }
 
-func performSearch(feedManager *feeds.Manager, viewState ViewState, feedID int64, searchType SearchType, query string) tea.Cmd {
+func syncFeedsFromTempFile(feedManager feeds.FeedManager, queries *database.Queries, tempFilePath string) tea.Cmd {
+	return func() tea.Msg {
+		// Read URLs from temp file
+		urlEntries, err := config.ReadURLsFileFromPath(tempFilePath)
+
+		// Delete temp file after reading (whether successful or not)
+		if tempFilePath != "" {
+			_ = os.Remove(tempFilePath)
+		}
+
+		if err != nil {
+			logging.Error("syncFeedsFromTempFile: failed to read temp file", "path", tempFilePath, "error", err)
+			return ErrorMsg{Err: err}
+		}
+
+		// Sync feeds with the URLs from temp file
+		return syncFeedsWithURLs(feedManager, queries, urlEntries)()
+	}
+}
+
+func performSearch(feedManager feeds.FeedManager, viewState ViewState, feedID int64, searchType SearchType, query string) tea.Cmd {
 	return func() tea.Msg {
 		// If query is empty, return empty results (will restore unfiltered list)
 		if query == "" {

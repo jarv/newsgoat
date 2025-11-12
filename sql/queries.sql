@@ -125,24 +125,6 @@ LEFT JOIN read_status rs ON i.id = rs.item_id
 WHERE i.feed_id = ?
 ORDER BY i.published DESC;
 
--- name: CreateLogMessage :exec
-INSERT INTO log_messages (level, message, timestamp, attributes)
-VALUES (?, ?, ?, ?);
-
--- name: GetLogMessages :many
-SELECT id, level, message, timestamp, attributes
-FROM log_messages
-ORDER BY timestamp DESC
-LIMIT ?;
-
--- name: GetLogMessage :one
-SELECT id, level, message, timestamp, attributes
-FROM log_messages
-WHERE id = ?;
-
--- name: DeleteAllLogMessages :exec
-DELETE FROM log_messages;
-
 -- name: GetSetting :one
 SELECT key, value, updated_at FROM settings WHERE key = ?;
 

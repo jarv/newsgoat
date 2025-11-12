@@ -11,6 +11,8 @@ require (
 	github.com/mmcdole/gofeed v1.3.0
 	github.com/ncruces/go-sqlite3 v0.30.1
 	golang.org/x/net v0.47.0
+	google.golang.org/grpc v1.76.0
+	google.golang.org/protobuf v1.36.10
 )
 
 require (
@@ -51,4 +53,5 @@ require (
 	golang.org/x/sys v0.38.0 // indirect
 	golang.org/x/term v0.37.0 // indirect
 	golang.org/x/text v0.31.0 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20250804133106-a7a43d27e69b // indirect
 )

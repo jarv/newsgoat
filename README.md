@@ -48,8 +48,7 @@ This will extract the `channel_id` and subscribe to the channel RSS feed.
   - sends conditional responses
   - respects `cache-control` and will use the local cache instead instead of a conditional response
   - sets a useful user-agent
-- **Local only**: There are no current plans for cloud syncing, sorry!
-- **URLs as plain text**: I am not a fan of yaml based configuration so feed URLs are in a plain text file similar to Newsboat
+- **Database-backed with plain text editing**: Feed URLs are stored in a local database but can be edited using your favorite text editor in a familiar plain text format (similar to Newsboat)
 - **Configuration in the UI**: For what little configuration there is, it is set in the UI instead of through a configuration file
 
 ## Alternatives
@@ -61,9 +60,63 @@ This will extract the `channel_id` and subscribe to the channel RSS feed.
 
 If you know of any other terminal-based RSS readers worth mentioning here please add them!
 
+## Operating Modes
+
+NewsGoat supports three operating modes:
+
+### Standalone Mode (Default)
+
+Run NewsGoat with a local SQLite database at `~/.config/newsgoat/newsgoat.db`:
+
+```bash
+newsgoat
+```
+
+This is the default mode where everything runs locally on your machine.
+
+### Client/Server Mode
+
+NewsGoat can run in a client/server architecture, useful for:
+- Sharing a single feed database across multiple devices
+- Running the server on a remote machine or home server
+- Keeping feed refresh operations on the server while accessing from multiple clients
+
+#### Server Mode
+
+Start a gRPC server that manages the database and feed operations:
+
+```bash
+export NEWSGOAT_API_KEY="your-secret-api-key"
+newsgoat --mode=server --server-port=50051 --db=/path/to/newsgoat.db
+```
+
+Options:
+- `--server-port`: Port for the gRPC server (default: 50051)
+- `--db`: Path to the SQLite database file (optional, defaults to `~/.config/newsgoat/newsgoat.db`)
+- `NEWSGOAT_API_KEY`: Environment variable for API authentication (required)
+
+#### Client Mode
+
+Connect to a remote NewsGoat server:
+
+```bash
+export NEWSGOAT_API_KEY="your-secret-api-key"
+newsgoat --mode=client --server-url=localhost:50051
+```
+
+Options:
+- `--server-url`: Address of the gRPC server (required)
+- `NEWSGOAT_API_KEY`: Environment variable for API authentication (optional, but required if server uses authentication)
+
+In client mode:
+- No local database is needed
+- All feed operations are performed on the server
+- Multiple clients can connect to the same server simultaneously
+- Feed refreshes happen on the server, keeping all clients in sync
+
 ## Configure
 
-Create a `.config/newsgoat/urls` file with one feed per line.
+NewsGoat stores feed URLs in a local SQLite database (`~/.config/newsgoat/newsgoat.db` by default). You can add and manage feeds through the UI (see "Add Feed URLs" section below).
 
 ## Development
 
@@ -83,8 +136,7 @@ This will configure git to run the linter before each commit.
 
 ```bash
 mise run build    # Build the binary
-go run .          # Run with urls file in .config/newsgoat/urls
-go run . -urlFile urls.example  # Run using the example urls file
+go run .          # Run the application
 ```
 
 ### Linting
@@ -194,20 +246,24 @@ Examples:
 - `https://youtube.com/@channel Tech News,YouTube`
 - `https://example.com "My Folder",Tech`
 
-### 3. Edit the URLs File Directly
+### 3. Edit URLs in Your Editor
 
-Press `U` (Shift+U) in the feed list view to open `~/.config/newsgoat/urls` in your `$EDITOR`.
+Press `U` (Shift+U) in the feed list view to open a temporary file in your `$EDITOR` with your current feeds.
 
-Alternatively, edit the file manually:
+**How it works:**
+- NewsGoat creates a temporary file populated with all your current feeds
+- Edit the file in your preferred editor (set via `$EDITOR` environment variable)
+- When you save and exit, NewsGoat updates the database with your changes
+- The temporary file is automatically deleted after syncing
 
-- Create/edit `~/.config/newsgoat/urls`
+**File format:**
 - Add one feed URL per line
 - Optionally add folders after the URL: `<url> folder1,folder2`
 - Use quotes for folder names with spaces: `<url> "folder name",otherfolder`
 - Lines starting with `#` are treated as comments
-- Save and press `Ctrl+R` in NewsGoat to reload
+- Feeds not in the file will be hidden (but not deleted from the database)
 
-Example `urls` file:
+Example format:
 
 ```text
 # Feeds can have folders! Format: <url> folder1,folder2
@@ -295,8 +351,8 @@ Search filters results in real-time as you type, making it easy to find specific
 | <kbd>/</kbd> | Global search (all feed content) |
 | <kbd>Ctrl</kbd>+<kbd>F</kbd> | Title search only |
 | <kbd>u</kbd> | Add URL with optional folders (e.g., `url folder1,folder2`) |
-| <kbd>U</kbd> | Edit URLs file in $EDITOR |
-| <kbd>Ctrl</kbd>+<kbd>R</kbd> | Reload URLs from file |
+| <kbd>U</kbd> | Edit URLs in $EDITOR (opens temporary file) |
+| <kbd>Ctrl</kbd>+<kbd>R</kbd> | Reload feed list from database |
 | <kbd>l</kbd> | View logs |
 | <kbd>t</kbd> | View tasks |
 | <kbd>c</kbd> | View settings |

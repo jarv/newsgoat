@@ -13,6 +13,31 @@ func InitDB() (*sql.DB, *Queries, error) {
 	return InitDBWithSchema("")
 }
 
+func InitDBWithSchemaAtPath(schemaSQL string, dbPath string) (*sql.DB, *Queries, error) {
+	// Create directory if it doesn't exist
+	dir := filepath.Dir(dbPath)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return nil, nil, err
+	}
+
+	// Open database with standard SQLite driver
+	db, err := sql.Open("sqlite3", dbPath)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Create tables if schema is provided
+	if schemaSQL != "" {
+		if err := createTables(db, schemaSQL); err != nil {
+			_ = db.Close()
+			return nil, nil, err
+		}
+	}
+
+	queries := New(db)
+	return db, queries, nil
+}
+
 func InitDBWithSchema(schemaSQL string) (*sql.DB, *Queries, error) {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {

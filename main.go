@@ -6,17 +6,25 @@ import (
 	"flag"
 	"fmt"
 	"log/slog"
+	"net"
 	"os"
+	"os/signal"
+	"syscall"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/jarv/newsgoat/internal/config"
 	"github.com/jarv/newsgoat/internal/database"
 	"github.com/jarv/newsgoat/internal/discovery"
 	"github.com/jarv/newsgoat/internal/feeds"
+	grpcclient "github.com/jarv/newsgoat/internal/grpc/client"
+	pb "github.com/jarv/newsgoat/internal/grpc/gen/newsgoat/v1"
+	grpcserver "github.com/jarv/newsgoat/internal/grpc/server"
 	"github.com/jarv/newsgoat/internal/logging"
 	"github.com/jarv/newsgoat/internal/tasks"
 	"github.com/jarv/newsgoat/internal/ui"
 	"github.com/jarv/newsgoat/internal/version"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
 )
 
 //go:embed sql/schema.sql
@@ -24,31 +32,38 @@ var schemaSQL string
 
 var logger *slog.Logger
 
-func setupLogging(queries *database.Queries, debug bool) {
-	slogHandler := logging.NewDatabaseHandlerWithDebug(queries, debug)
-	logger = slog.New(slogHandler)
+func setupLogging(debug bool) {
+	// Use in-memory logging handler (stores last 1000 messages)
+	memoryHandler := logging.NewMemoryHandlerWithDebug(1000, debug)
+	logger = slog.New(memoryHandler)
 
-	// Set the global logger for other packages
+	// Set the global logger and memory handler for other packages
 	logging.SetLogger(logger)
+	logging.SetMemoryHandler(memoryHandler)
 }
 
 func main() {
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: newsgoat [options] [command]\n\n")
 		fmt.Fprintf(os.Stderr, "Commands:\n")
-		fmt.Fprintf(os.Stderr, "  add <url>    Add a feed URL to the URLs file\n\n")
+		fmt.Fprintf(os.Stderr, "  add <url>    Add a feed URL to the database\n\n")
 		fmt.Fprintf(os.Stderr, "Options:\n")
 		flag.PrintDefaults()
 		fmt.Fprintf(os.Stderr, "\nEnvironment Variables:\n")
 		fmt.Fprintf(os.Stderr, "  GITHUB_FEED_TOKEN   Access token for private GitHub repository feeds\n")
 		fmt.Fprintf(os.Stderr, "  GITLAB_FEED_TOKEN   Access token for private GitLab repository feeds\n")
+		fmt.Fprintf(os.Stderr, "  NEWSGOAT_API_KEY    API key for client/server authentication\n")
 	}
 
-	var feedTest = flag.Bool("feedTest", false, "Run feed test harness server")
-	var showVersion = flag.Bool("version", false, "Show version information")
-	var debug = flag.Bool("debug", false, "Enable debug logging")
-	var urlFile = flag.String("u", "", "Path to URL file (overrides default location)")
-	flag.StringVar(urlFile, "urlFile", "", "Path to URL file (overrides default location)")
+	var (
+		feedTest   = flag.Bool("feedTest", false, "Run feed test harness server")
+		showVersion = flag.Bool("version", false, "Show version information")
+		debug      = flag.Bool("debug", false, "Enable debug logging")
+		mode       = flag.String("mode", "standalone", "Operating mode: standalone, client, or server")
+		serverURL  = flag.String("server-url", "", "gRPC server URL for client mode (e.g., localhost:50051)")
+		serverPort = flag.Int("server-port", 50051, "gRPC server port for server mode")
+		dbPath     = flag.String("db", "", "Path to SQLite database file (server mode only)")
+	)
 	flag.Parse()
 
 	if *showVersion {
@@ -64,7 +79,45 @@ func main() {
 		return
 	}
 
-	// Check for subcommands
+	// Handle mode selection
+	switch *mode {
+	case "server":
+		// Server mode - run gRPC server
+		apiKey := os.Getenv("NEWSGOAT_API_KEY")
+		if apiKey == "" {
+			fmt.Fprintf(os.Stderr, "Error: NEWSGOAT_API_KEY environment variable is required for server mode\n")
+			os.Exit(1)
+		}
+		if err := runServer(*serverPort, apiKey, *dbPath, *debug); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+		return
+
+	case "client":
+		// Client mode - connect to gRPC server
+		if *serverURL == "" {
+			fmt.Fprintf(os.Stderr, "Error: --server-url is required for client mode\n")
+			flag.Usage()
+			os.Exit(1)
+		}
+		apiKey := os.Getenv("NEWSGOAT_API_KEY")
+		if err := runClient(*serverURL, apiKey, *debug); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+		return
+
+	case "standalone":
+		// Standalone mode - local database (default)
+		// Continue to command handling below
+
+	default:
+		fmt.Fprintf(os.Stderr, "Error: invalid mode '%s'. Must be: standalone, client, or server\n", *mode)
+		os.Exit(1)
+	}
+
+	// Check for subcommands (standalone mode only)
 	args := flag.Args()
 	if len(args) > 0 {
 		switch args[0] {
@@ -85,13 +138,29 @@ func main() {
 		}
 	}
 
-	if err := run(*urlFile, *debug); err != nil {
+	if err := run(*debug); err != nil {
 		fmt.Fprintf(os.Stderr, "2Error: %v\n", err)
 		os.Exit(1)
 	}
 }
 
 func addURL(urlArg string) error {
+	// Initialize database
+	db, queries, err := database.InitDBWithSchema(schemaSQL)
+	if err != nil {
+		return fmt.Errorf("failed to initialize database: %w", err)
+	}
+	defer func() {
+		_ = db.Close()
+	}()
+
+	// Run migrations
+	if err := RunMigrations(db); err != nil {
+		return fmt.Errorf("failed to run migrations: %w", err)
+	}
+
+	feedManager := feeds.NewManager(db, queries)
+
 	// Try to discover the feed URL
 	fmt.Printf("Discovering feed URL from: %s\n", urlArg)
 	feedURL, err := discovery.DiscoverFeed(urlArg)
@@ -103,16 +172,16 @@ func addURL(urlArg string) error {
 		fmt.Printf("Discovered feed URL: %s\n", feedURL)
 	}
 
-	// Add the URL to the URLs file
-	if err := config.AddURL(feedURL); err != nil {
-		return fmt.Errorf("failed to add URL to file: %w", err)
+	// Add the feed to the database
+	if err := feedManager.AddFeedWithoutFetching(feedURL); err != nil {
+		return fmt.Errorf("failed to add feed to database: %w", err)
 	}
 
 	fmt.Printf("Successfully added feed: %s\n", feedURL)
 	return nil
 }
 
-func run(urlFile string, debug bool) error {
+func run(debug bool) error {
 	// Initialize database first
 	db, queries, err := database.InitDBWithSchema(schemaSQL)
 	if err != nil {
@@ -132,7 +201,7 @@ func run(urlFile string, debug bool) error {
 	}
 
 	// Setup logging after database is initialized
-	setupLogging(queries, debug)
+	setupLogging(debug)
 	defer func() {
 		if closeErr := db.Close(); closeErr != nil {
 			logger.Error("Error closing database", "error", closeErr)
@@ -159,39 +228,7 @@ func run(urlFile string, debug bool) error {
 		return fmt.Errorf("failed to register feed refresh handler: %w", err)
 	}
 
-	if err := config.CreateSampleURLsFile(); err != nil {
-		logger.Warn("Failed to create sample URLs file", "error", err)
-	}
-
-	// Get URLs file path
-	urlsPath, err := config.GetURLsFilePath()
-	if err != nil {
-		logger.Warn("Failed to get URLs file path", "error", err)
-		urlsPath = ""
-	}
-
-	var urlEntries []config.URLEntry
-	if urlFile != "" {
-		var readErr error
-		urlEntries, readErr = config.ReadURLsFileFromPath(urlFile)
-		if readErr != nil {
-			return fmt.Errorf("failed to read URLs file: %w", readErr)
-		}
-		urlsPath = urlFile
-	} else {
-		var readErr error
-		urlEntries, readErr = config.ReadURLsFile()
-		if readErr != nil {
-			return fmt.Errorf("failed to read URLs file: %w", readErr)
-		}
-	}
-
-	if err := syncFeedsWithURLsFile(feedManager, queries, urlEntries); err != nil {
-		logger.Warn("Failed to sync feeds with URLs file", "error", err)
-	}
-
 	model := ui.NewModel(feedManager, taskManager, queries, cfg)
-	model.SetURLsFilePath(urlsPath)
 	p := tea.NewProgram(model, tea.WithAltScreen())
 
 	if _, err := p.Run(); err != nil {
@@ -201,81 +238,122 @@ func run(urlFile string, debug bool) error {
 	return nil
 }
 
-func syncFeedsWithURLsFile(feedManager *feeds.Manager, queries *database.Queries, urlEntries []config.URLEntry) error {
-	// Get all feeds from database (including hidden ones)
-	allFeeds, err := feedManager.GetAllFeeds()
+// runServer starts the gRPC server
+func runServer(port int, apiKey, dbPath string, debug bool) error {
+	// Initialize database
+	var db, queries, err = database.InitDBWithSchema(schemaSQL)
+	if dbPath != "" {
+		db, queries, err = database.InitDBWithSchemaAtPath(schemaSQL, dbPath)
+	}
 	if err != nil {
-		return fmt.Errorf("failed to get all feeds: %w", err)
+		return fmt.Errorf("failed to initialize database: %w", err)
 	}
-
-	// Create a map of URLs from the file for quick lookup
-	urlsFromFileSet := make(map[string]config.URLEntry)
-	for _, entry := range urlEntries {
-		urlsFromFileSet[entry.URL] = entry
-	}
-
-	// Create a set of URLs from DB for quick lookup
-	urlsFromDBSet := make(map[string]bool)
-	for _, feed := range allFeeds {
-		urlsFromDBSet[feed.Url] = true
-	}
-
-	// Hide feeds that are in DB but not in URLs file
-	for _, feed := range allFeeds {
-		if _, exists := urlsFromFileSet[feed.Url]; !exists {
-			if err := feedManager.HideFeedByURL(feed.Url); err != nil {
-				logger.Warn("Failed to hide feed", "url", feed.Url, "error", err)
-			}
+	defer func() {
+		if closeErr := db.Close(); closeErr != nil {
+			logger.Error("Error closing database", "error", closeErr)
 		}
+	}()
+
+	// Run migrations
+	if err := RunMigrations(db); err != nil {
+		return fmt.Errorf("failed to run migrations: %w", err)
 	}
 
-	// Show/Add feeds that are in URLs file and update folders
+	// Setup logging
+	setupLogging(debug)
+	logger.Info("Starting newsgoat gRPC server", "version", version.GetVersion(), "port", port)
+
+	// Create feed manager
+	manager := feeds.NewManager(db, queries)
+
+	// Create TCP listener
+	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
+	if err != nil {
+		return fmt.Errorf("failed to listen on port %d: %w", port, err)
+	}
+
+	// Create gRPC server with auth interceptor
+	authInterceptor := grpcserver.NewAuthInterceptor(apiKey)
+	grpcServer := grpc.NewServer(
+		grpc.UnaryInterceptor(authInterceptor.Unary()),
+		grpc.StreamInterceptor(authInterceptor.Stream()),
+	)
+
+	// Register services
+	feedService := grpcserver.NewFeedService(manager)
+	settingsService := grpcserver.NewSettingsService(queries)
+
+	pb.RegisterFeedServiceServer(grpcServer, feedService)
+	pb.RegisterSettingsServiceServer(grpcServer, settingsService)
+
+	// Register reflection service for debugging (grpcurl, etc.)
+	reflection.Register(grpcServer)
+
+	// Handle graceful shutdown
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+
+	errChan := make(chan error, 1)
+	go func() {
+		logger.Info("gRPC server listening", "address", lis.Addr())
+		if err := grpcServer.Serve(lis); err != nil {
+			errChan <- fmt.Errorf("failed to serve: %w", err)
+		}
+	}()
+
+	// Wait for shutdown signal or error
+	select {
+	case err := <-errChan:
+		return err
+	case sig := <-sigChan:
+		logger.Info("Received shutdown signal", "signal", sig)
+		grpcServer.GracefulStop()
+		logger.Info("Server shutdown complete")
+		return nil
+	}
+}
+
+// runClient starts the TUI in client mode connected to a gRPC server
+func runClient(serverURL, apiKey string, debug bool) error {
+	fmt.Printf("Connecting to gRPC server at %s...\n", serverURL)
+
+	// Create gRPC client
+	client, err := grpcclient.NewClient(serverURL, apiKey)
+	if err != nil {
+		return fmt.Errorf("failed to connect to server: %w", err)
+	}
+	defer func() {
+		_ = client.Close()
+	}()
+
+	fmt.Println("Connected successfully!")
+
+	// Setup in-memory logging (no local database needed in client mode)
+	setupLogging(debug)
+
+	// Use default configuration in client mode
+	cfg := config.GetDefaultConfig()
+
+	// Create task manager (but don't use it for feed refreshes in client mode)
+	taskManager := tasks.NewManager(cfg.ReloadConcurrency)
 	ctx := context.Background()
-	for _, entry := range urlEntries {
-		var feedID int64
-		if urlsFromDBSet[entry.URL] {
-			// Feed exists in DB, make sure it's visible
-			if err := feedManager.ShowFeedByURL(entry.URL); err != nil {
-				logger.Warn("Failed to show feed", "url", entry.URL, "error", err)
-				continue
-			}
-			// Get feed ID
-			feed, err := queries.GetFeedByURL(ctx, entry.URL)
-			if err != nil {
-				logger.Warn("Failed to get feed by URL", "url", entry.URL, "error", err)
-				continue
-			}
-			feedID = feed.ID
-		} else {
-			// Feed doesn't exist, add it without fetching
-			if err := feedManager.AddFeedWithoutFetching(entry.URL); err != nil {
-				logger.Warn("Failed to add feed", "url", entry.URL, "error", err)
-				continue
-			}
-			// Get the newly created feed ID
-			feed, err := queries.GetFeedByURL(ctx, entry.URL)
-			if err != nil {
-				logger.Warn("Failed to get newly created feed", "url", entry.URL, "error", err)
-				continue
-			}
-			feedID = feed.ID
+	if err := taskManager.Start(ctx); err != nil {
+		return fmt.Errorf("failed to start task manager: %w", err)
+	}
+	defer func() {
+		if stopErr := taskManager.Stop(); stopErr != nil {
+			logger.Debug("Task manager already stopped", "error", stopErr)
 		}
+	}()
 
-		// Update folders for this feed
-		// First, delete existing folders
-		if err := queries.DeleteFeedFolders(ctx, feedID); err != nil {
-			logger.Warn("Failed to delete old folders", "feed_id", feedID, "error", err)
-		}
+	// Note: We pass the client as the manager interface to the UI
+	// The UI will call the client methods, which forward to the gRPC server
+	// No local database needed in client mode - queries is nil
+	model := ui.NewModel(client, taskManager, nil, cfg)
+	p := tea.NewProgram(model, tea.WithAltScreen())
 
-		// Then add new folders
-		for _, folder := range entry.Folders {
-			if err := queries.AddFeedFolder(ctx, database.AddFeedFolderParams{
-				FeedID:     feedID,
-				FolderName: folder,
-			}); err != nil {
-				logger.Warn("Failed to add folder", "feed_id", feedID, "folder", folder, "error", err)
-			}
-		}
+	if _, err := p.Run(); err != nil {
+		return fmt.Errorf("failed to run TUI: %w", err)
 	}
 
 	return nil

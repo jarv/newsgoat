@@ -256,6 +256,22 @@ func (m *Manager) GetAllFeeds() ([]database.Feed, error) {
 	return m.queries.ListAllFeeds(context.Background())
 }
 
+// GetVisibleFeeds returns only visible feeds
+func (m *Manager) GetVisibleFeeds() ([]database.Feed, error) {
+	m.dbMutex.RLock()
+	defer m.dbMutex.RUnlock()
+
+	return m.queries.ListFeeds(context.Background())
+}
+
+// GetFeedByURL returns a feed by its URL
+func (m *Manager) GetFeedByURL(url string) (database.Feed, error) {
+	m.dbMutex.RLock()
+	defer m.dbMutex.RUnlock()
+
+	return m.queries.GetFeedByURL(context.Background(), url)
+}
+
 func (m *Manager) RefreshFeedByURL(url string) error {
 	m.dbMutex.RLock()
 	feed, err := m.queries.GetFeedByURL(context.Background(), url)
@@ -660,23 +676,34 @@ func (m *Manager) AddLinkMarkersToHTML(content string) (string, []string) {
 }
 
 func (m *Manager) GetLogMessages(limit int64) ([]LogMessage, error) {
-	m.dbMutex.RLock()
-	result, err := m.queries.GetLogMessages(context.Background(), limit)
-	m.dbMutex.RUnlock()
-	return result, err
+	// Use the in-memory logging handler instead of database queries
+	messages, err := logging.GetLogMessages(int(limit))
+	if err != nil {
+		return nil, err
+	}
+	// Convert []*LogMessage to []LogMessage
+	result := make([]LogMessage, len(messages))
+	for i, msg := range messages {
+		result[i] = *msg
+	}
+	return result, nil
 }
 
 func (m *Manager) GetLogMessage(id int64) (LogMessage, error) {
-	m.dbMutex.RLock()
-	result, err := m.queries.GetLogMessage(context.Background(), id)
-	m.dbMutex.RUnlock()
-	return result, err
+	// Use the in-memory logging handler instead of database queries
+	msg, err := logging.GetLogMessage(id)
+	if err != nil {
+		return LogMessage{}, err
+	}
+	if msg == nil {
+		return LogMessage{}, nil
+	}
+	return *msg, nil
 }
 
 func (m *Manager) DeleteAllLogMessages() error {
-	m.dbMutex.Lock()
-	defer m.dbMutex.Unlock()
-	return m.queries.DeleteAllLogMessages(context.Background())
+	// Use the in-memory logging handler instead of database queries
+	return logging.DeleteAllLogMessages()
 }
 
 func (m *Manager) recordFeedError(feedID int64, err error) {

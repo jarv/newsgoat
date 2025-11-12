@@ -155,7 +155,7 @@ const (
 )
 
 type Model struct {
-	feedManager                     *feeds.Manager
+	feedManager                     feeds.FeedManager
 	taskManager                     tasks.Manager
 	queries                         *database.Queries
 	config                          config.Config
@@ -174,7 +174,6 @@ type Model struct {
 	currentLog                      database.LogMessage
 	taskList                        []*tasks.Task
 	urlsList                        []config.URLEntry
-	urlsFilePath                    string
 	links                           []string
 	cursor                          int
 	savedItemCursor                 int
@@ -312,7 +311,9 @@ type URLsReloadedMsg struct {
 	FilePath string
 }
 
-type EditorFinishedMsg struct{}
+type EditorFinishedMsg struct {
+	TempFilePath string
+}
 
 type EditorErrorMsg struct {
 	Err string
@@ -395,7 +396,7 @@ func createGlamourRenderer(themeName string) (*glamour.TermRenderer, error) {
 	return renderer, nil
 }
 
-func NewModel(feedManager *feeds.Manager, taskManager tasks.Manager, queries *database.Queries, cfg config.Config) Model {
+func NewModel(feedManager feeds.FeedManager, taskManager tasks.Manager, queries *database.Queries, cfg config.Config) Model {
 	// Create glamour renderer based on theme
 	renderer, err := createGlamourRenderer(cfg.ThemeName)
 
@@ -427,10 +428,6 @@ func NewModel(feedManager *feeds.Manager, taskManager tasks.Manager, queries *da
 		expandedFolders:      make(map[string]bool),
 		folderStats:          make(map[string]struct{ UnreadItems, TotalItems int64 }),
 	}
-}
-
-func (m *Model) SetURLsFilePath(path string) {
-	m.urlsFilePath = path
 }
 
 func (m Model) Init() tea.Cmd {
@@ -626,20 +623,21 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case URLsListLoadedMsg:
 		m.urlsList = msg.URLs
-		m.urlsFilePath = msg.FilePath
 		return m, nil
 
 	case URLsReloadedMsg:
 		m.urlsList = msg.URLs
 		// Set info message
-		m.statusMessage = "urls reloaded from " + msg.FilePath
+		m.statusMessage = "urls reloaded"
 		m.statusMessageType = "info"
 		// Sync feeds with the reloaded URLs
 		return m, syncFeedsWithURLs(m.feedManager, m.queries, msg.URLs)
 
 	case EditorFinishedMsg:
-		// After editor closes, reload URLs and sync feeds
-		return m, reloadURLsFromFile(m.feedManager)
+		// After editor closes, sync feeds from temp file
+		m.statusMessage = "URLs synced from editor"
+		m.statusMessageType = "info"
+		return m, syncFeedsFromTempFile(m.feedManager, m.queries, msg.TempFilePath)
 
 	case EditorErrorMsg:
 		// Display error message
@@ -925,8 +923,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.statusMessage = "Added feed: " + msg.URL
 		}
 		m.statusMessageType = "info"
-		// Reload feed list and sync feeds
-		return m, tea.Batch(loadFeedList(m.feedManager), reloadURLsFromFile(m.feedManager))
+		// Reload feed list to show the new feed
+		return m, loadFeedList(m.feedManager)
 
 	case URLAddErrorMsg:
 		// Set error message
@@ -1032,7 +1030,7 @@ func (m Model) handleFeedListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				url := m.urlInput
 				m.addingURL = false
 				m.urlInput = ""
-				return m, addURLAndDiscover(m.feedManager, url)
+				return m, addURLAndDiscover(m.feedManager, m.queries, url)
 			}
 			// Empty input, just cancel
 			m.addingURL = false
@@ -1243,8 +1241,8 @@ func (m Model) handleFeedListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case "ctrl+r":
-		// Reload URLs from file and sync with feeds
-		return m, reloadURLsFromFile(m.feedManager)
+		// Reload feed list from database
+		return m, loadFeedList(m.feedManager)
 
 	case "?":
 		m.previousState = m.state
@@ -1389,7 +1387,11 @@ func (m Model) handleFeedListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 				// Find feeds in this folder and create tasks
 				for _, feed := range allFeeds {
-					folders, err := m.queries.GetFeedFolders(ctx, feed.ID)
+					var folders []string
+					var err error
+					if m.queries != nil {
+						folders, err = m.queries.GetFeedFolders(ctx, feed.ID)
+					}
 					if err == nil {
 						for _, folder := range folders {
 							if folder == item.FolderName {
@@ -1453,7 +1455,7 @@ func (m Model) handleFeedListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		// Open URLs file in editor
-		return m, openURLsFileInEditor()
+		return m, openURLsFileInEditor(m.feedManager, m.queries)
 
 	case "i":
 		// Show feed info (only for feeds, not folders)
@@ -2013,7 +2015,11 @@ func (m *Model) buildFeedDisplayList(feeds []database.GetFeedStatsRow) {
 
 	for _, feed := range feeds {
 		// Get folders for this feed
-		folders, err := m.queries.GetFeedFolders(ctx, feed.ID)
+		var folders []string
+		var err error
+		if m.queries != nil {
+			folders, err = m.queries.GetFeedFolders(ctx, feed.ID)
+		}
 		if err != nil || len(folders) == 0 {
 			// Feed has no folders
 			feedsWithoutFolders = append(feedsWithoutFolders, feed)
@@ -2206,21 +2212,16 @@ func (m Model) renderFeedList() string {
 		// Only show "add URLs" message if there are actually no feeds in the database
 		// Don't show it if feeds are just filtered out (e.g., ShowReadFeeds = no)
 		if m.totalFeedCount == 0 {
-			var urlPath string
-			if m.urlsFilePath != "" {
-				urlPath = m.urlsFilePath
-			} else {
-				urlPath = "~/.config/newsgoat/urls"
-			}
-			content = "Add RSS feeds to " + urlPath + " by\n" +
-				"editing the file by pressing 'U' or press 'u' to add\n" +
-				"a single feed URL.\n" +
+			content = "No RSS feeds found.\n" +
+				"\n" +
+				"Press 'U' to open your editor and add feeds, or\n" +
+				"press 'u' to add a single feed URL.\n" +
 				"\n" +
 				"Hints:\n" +
 				"- Press 'R' to reload all feeds\n" +
 				"- Press 'c' to view the config\n" +
 				"- See keyboard shortcuts with 'h'"
-			contentLines = 8
+			contentLines = 9
 		} else if m.searchMode && m.searchQuery != "" {
 			content = "No feeds match search"
 			contentLines = 1
@@ -2274,7 +2275,7 @@ func (m Model) renderFeedList() string {
 	// - Scroll indicator line (1)
 	// - Search prompt line (1) - always allocated
 	// Total: 5 lines
-	availableHeight := m.height - 5
+	availableHeight := m.height - 4
 	if availableHeight < 3 {
 		availableHeight = 3 // Minimum usable height
 	}
@@ -2958,14 +2959,21 @@ func (m Model) renderLogList() string {
 	if len(m.logList) == 0 {
 		content := "No log messages found."
 		// Calculate padding to push status bar to bottom
-		contentLines := strings.Count(b.String()+content, "\n") + 2
-		padding := m.height - contentLines - 1
+		// usedLines = title (1) + empty line (1) + content (1) + status bar (1) + search line (1)
+		headerLines := 2  // title + empty line after header
+		contentLines := 1 // "No log messages found."
+		bottomLines := 2  // status bar + search line
+		usedLines := headerLines + contentLines + bottomLines
+		padding := m.height - usedLines
 		if padding < 0 {
 			padding = 0
 		}
 		b.WriteString(content)
+		b.WriteString("\n")
 		b.WriteString(strings.Repeat("\n", padding))
 		b.WriteString(statusBar)
+		// Show search prompt line (always allocated for consistent layout)
+		b.WriteString("\n")
 		return b.String()
 	}
 
@@ -3027,7 +3035,7 @@ func (m Model) renderLogList() string {
 
 	// Calculate padding to push status bar to bottom
 	headerLines := 2    // title + empty line
-	statusBarLines := 2 // scroll info + status bar
+	statusBarLines := 2 // (scroll info + status bar on same line) + search line
 	usedLines := headerLines + logLines + statusBarLines
 	padding := m.height - usedLines
 	if padding < 0 {
@@ -3043,6 +3051,9 @@ func (m Model) renderLogList() string {
 	}
 
 	b.WriteString(statusBar)
+
+	// Show search prompt line (always allocated for consistent layout)
+	b.WriteString("\n")
 
 	return b.String()
 }
@@ -3374,14 +3385,21 @@ func (m Model) renderTasksView() string {
 	if len(m.taskList) == 0 {
 		content := "No tasks found."
 		// Calculate padding to push status bar to bottom
-		contentLines := strings.Count(b.String()+content, "\n") + 2
-		padding := m.height - contentLines - 1
+		// usedLines = title (1) + empty line (1) + content (1) + status bar (1) + search line (1)
+		headerLines := 2  // title + empty line after header
+		contentLines := 1 // "No tasks found."
+		bottomLines := 2  // status bar + search line
+		usedLines := headerLines + contentLines + bottomLines
+		padding := m.height - usedLines
 		if padding < 0 {
 			padding = 0
 		}
 		b.WriteString(content)
+		b.WriteString("\n")
 		b.WriteString(strings.Repeat("\n", padding))
 		b.WriteString(statusBar)
+		// Show search prompt line (always allocated for consistent layout)
+		b.WriteString("\n")
 		return b.String()
 	}
 
@@ -3449,7 +3467,7 @@ func (m Model) renderTasksView() string {
 
 	// Calculate padding to push status bar to bottom
 	headerLines := 2    // title + empty line
-	statusBarLines := 2 // scroll info + status bar
+	statusBarLines := 2 // (scroll info + status bar on same line) + search line
 	usedLines := headerLines + taskLines + statusBarLines
 	padding := m.height - usedLines
 	if padding < 0 {
@@ -3465,6 +3483,9 @@ func (m Model) renderTasksView() string {
 	}
 
 	b.WriteString(statusBar)
+
+	// Show search prompt line (always allocated for consistent layout)
+	b.WriteString("\n")
 
 	return b.String()
 }
@@ -4273,11 +4294,8 @@ func (m Model) handleURLsViewKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case "j", "down":
 		// Calculate max scroll based on content
-		totalLines := len(m.urlsList) + 3 // +3 for title, empty line, and file path
-		if m.urlsFilePath == "" {
-			totalLines = len(m.urlsList) + 2 // +2 for title and empty line
-		}
-		availableHeight := m.height - 3 // -3 for title, empty line, and status bar
+		totalLines := len(m.urlsList) + 2 // +2 for title and empty line
+		availableHeight := m.height - 3   // -3 for title, empty line, and status bar
 		if availableHeight < 1 {
 			availableHeight = 1
 		}
@@ -4296,10 +4314,7 @@ func (m Model) handleURLsViewKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case "ctrl+d":
 		// Calculate max scroll based on content
-		totalLines := len(m.urlsList) + 3
-		if m.urlsFilePath == "" {
-			totalLines = len(m.urlsList) + 2
-		}
+		totalLines := len(m.urlsList) + 2
 		availableHeight := m.height - 3
 		if availableHeight < 1 {
 			availableHeight = 1
@@ -4381,12 +4396,6 @@ func (m Model) renderFeedInfo() string {
 func (m Model) renderURLsView() string {
 	// Build all content lines first
 	var allLines []string
-
-	// Add file path line if present
-	if m.urlsFilePath != "" {
-		allLines = append(allLines, m.getHelpStyle().Render("File: "+m.urlsFilePath))
-		allLines = append(allLines, "") // Empty line after file path
-	}
 
 	// Add URLs or "No URLs found" message
 	if len(m.urlsList) == 0 {

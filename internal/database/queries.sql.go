@@ -118,37 +118,6 @@ func (q *Queries) CreateItem(ctx context.Context, arg CreateItemParams) (Item, e
 	return i, err
 }
 
-const createLogMessage = `-- name: CreateLogMessage :exec
-INSERT INTO log_messages (level, message, timestamp, attributes)
-VALUES (?, ?, ?, ?)
-`
-
-type CreateLogMessageParams struct {
-	Level      string         `json:"level"`
-	Message    string         `json:"message"`
-	Timestamp  sql.NullTime   `json:"timestamp"`
-	Attributes sql.NullString `json:"attributes"`
-}
-
-func (q *Queries) CreateLogMessage(ctx context.Context, arg CreateLogMessageParams) error {
-	_, err := q.db.ExecContext(ctx, createLogMessage,
-		arg.Level,
-		arg.Message,
-		arg.Timestamp,
-		arg.Attributes,
-	)
-	return err
-}
-
-const deleteAllLogMessages = `-- name: DeleteAllLogMessages :exec
-DELETE FROM log_messages
-`
-
-func (q *Queries) DeleteAllLogMessages(ctx context.Context) error {
-	_, err := q.db.ExecContext(ctx, deleteAllLogMessages)
-	return err
-}
-
 const deleteFeed = `-- name: DeleteFeed :exec
 DELETE FROM feeds WHERE id = ?
 `
@@ -452,61 +421,6 @@ func (q *Queries) GetItemsWithReadStatus(ctx context.Context, feedID int64) ([]G
 			&i.Published,
 			&i.CreatedAt,
 			&i.Read,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const getLogMessage = `-- name: GetLogMessage :one
-SELECT id, level, message, timestamp, attributes
-FROM log_messages
-WHERE id = ?
-`
-
-func (q *Queries) GetLogMessage(ctx context.Context, id int64) (LogMessage, error) {
-	row := q.db.QueryRowContext(ctx, getLogMessage, id)
-	var i LogMessage
-	err := row.Scan(
-		&i.ID,
-		&i.Level,
-		&i.Message,
-		&i.Timestamp,
-		&i.Attributes,
-	)
-	return i, err
-}
-
-const getLogMessages = `-- name: GetLogMessages :many
-SELECT id, level, message, timestamp, attributes
-FROM log_messages
-ORDER BY timestamp DESC
-LIMIT ?
-`
-
-func (q *Queries) GetLogMessages(ctx context.Context, limit int64) ([]LogMessage, error) {
-	rows, err := q.db.QueryContext(ctx, getLogMessages, limit)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []LogMessage
-	for rows.Next() {
-		var i LogMessage
-		if err := rows.Scan(
-			&i.ID,
-			&i.Level,
-			&i.Message,
-			&i.Timestamp,
-			&i.Attributes,
 		); err != nil {
 			return nil, err
 		}
