@@ -1,3 +1,18 @@
+# [2.0.0](https://github.com/jarv/newsgoat/compare/v1.11.14...v2.0.0) (2025-11-21)
+
+
+### Features
+
+* Client/server mode ([ebc1da7](https://github.com/jarv/newsgoat/commit/ebc1da7da2f6183001b981f75b169fbea62d2ab4))
+
+
+### BREAKING CHANGES
+
+* Removes the file-based url config
+
+- client/server mode
+- refactor logging
+
 ## [1.11.14](https://github.com/jarv/newsgoat/compare/v1.11.13...v1.11.14) (2025-11-11)
 
 
