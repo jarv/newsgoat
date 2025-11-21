@@ -37,9 +37,9 @@ func NewManager(maxWorkers int) Manager {
 	return &DefaultManager{
 		maxWorkers: maxWorkers,
 		tasks:      make(map[string]*Task),
-		taskQueue:  make(chan *Task, 100), // Buffered channel for task queue
+		taskQueue:  make(chan *Task, 1000), // Buffered channel for task queue
 		handlers:   make(map[TaskType]TaskHandler),
-		events:     make(chan TaskEvent, 100), // Buffered channel for events
+		events:     make(chan TaskEvent, 1000), // Buffered channel for events
 	}
 }
 
@@ -105,12 +105,12 @@ func (m *DefaultManager) AddTask(task *Task) error {
 	}
 	task.Status = TaskStatusPending
 
-	m.mutex.Lock()
-	m.tasks[task.ID] = task
-	m.mutex.Unlock()
-
+	// Try to add to queue first, only store if successful
 	select {
 	case m.taskQueue <- task:
+		m.mutex.Lock()
+		m.tasks[task.ID] = task
+		m.mutex.Unlock()
 		return nil
 	default:
 		return fmt.Errorf("task queue is full")
