@@ -1,3 +1,10 @@
+## [2.0.1](https://github.com/jarv/newsgoat/compare/v2.0.0...v2.0.1) (2025-11-21)
+
+
+### Bug Fixes
+
+* Increase task queue to 1000 to support more feeds ([6a3885a](https://github.com/jarv/newsgoat/commit/6a3885a16d38b0647578171bebbde3648e7dd53c))
+
 # [2.0.0](https://github.com/jarv/newsgoat/compare/v1.11.14...v2.0.0) (2025-11-21)
 
 
