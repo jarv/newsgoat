@@ -1,3 +1,10 @@
+## [2.0.4](https://github.com/jarv/newsgoat/compare/v2.0.3...v2.0.4) (2025-11-24)
+
+
+### Bug Fixes
+
+* Fixes grpc support for settings, config and folder ops ([463537c](https://github.com/jarv/newsgoat/commit/463537c8b5e9321bb77b00cf2d8c68be93c03250))
+
 ## [2.0.3](https://github.com/jarv/newsgoat/compare/v2.0.2...v2.0.3) (2025-11-24)
 
 
