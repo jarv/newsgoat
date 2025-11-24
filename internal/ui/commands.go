@@ -35,7 +35,16 @@ func loadItemList(feedManager feeds.FeedManager, feedID int64) tea.Cmd {
 			logging.Error("loadItemList failed", "feedID", feedID, "error", err)
 			return ErrorMsg{Err: err}
 		}
-		return ItemListLoadedMsg{Items: items}
+
+		// Also fetch feed info for display
+		feed, err := feedManager.GetFeed(feedID)
+		if err != nil {
+			logging.Error("loadItemList: failed to get feed info", "feedID", feedID, "error", err)
+			// Return items without feed info - render will handle missing feed
+			return ItemListLoadedMsg{Items: items}
+		}
+
+		return ItemListLoadedMsg{Items: items, Feed: feed}
 	}
 }
 

@@ -280,6 +280,7 @@ type FeedListLoadedMsg struct {
 
 type ItemListLoadedMsg struct {
 	Items []database.GetItemsWithReadStatusRow
+	Feed  database.Feed // Feed info for display
 }
 
 type SearchResultsMsg struct {
@@ -536,6 +537,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case ItemListLoadedMsg:
 		m.itemList = msg.Items
+		m.currentFeed = msg.Feed // Cache feed info for rendering
 
 		if m.state == ItemListView {
 			// Preserve cursor position when refreshing
@@ -2454,20 +2456,15 @@ func (m Model) renderFeedList() string {
 func (m Model) renderItemList() string {
 	var b strings.Builder
 
-	// Get the feed name for the title
+	// Get the feed name for the title (use cached feed info)
 	var titleText string
-	if m.selectedFeed != 0 {
-		feed, err := m.feedManager.GetFeed(m.selectedFeed)
-		if err != nil {
-			titleText = "🐐 NewsGoat - Feed Items"
-		} else {
-			// Convert to GetFeedStatsRow for getDisplayTitle
-			feedStats := database.GetFeedStatsRow{
-				Url:   feed.Url,
-				Title: feed.Title,
-			}
-			titleText = "🐐 NewsGoat - " + getDisplayTitle(feedStats)
+	if m.currentFeed.ID != 0 {
+		// Use cached feed info from ItemListLoadedMsg
+		feedStats := database.GetFeedStatsRow{
+			Url:   m.currentFeed.Url,
+			Title: m.currentFeed.Title,
 		}
+		titleText = "🐐 NewsGoat - " + getDisplayTitle(feedStats)
 	} else {
 		titleText = "🐐 NewsGoat - Feed Items"
 	}
@@ -2634,13 +2631,12 @@ func (m *Model) getArticleContentLines() []string {
 	// Build content
 	var contentBuilder strings.Builder
 
-	// Get feed information for the header
-	feed, err := m.feedManager.GetFeed(m.currentItem.FeedID)
+	// Use cached feed info from m.currentFeed (populated when loading item list)
 	var feedTitle string
-	if err != nil {
-		feedTitle = "Unknown Feed"
+	if m.currentFeed.ID != 0 {
+		feedTitle = m.currentFeed.Title
 	} else {
-		feedTitle = feed.Title
+		feedTitle = "Unknown Feed"
 	}
 
 	// Create subtle gray style for header

@@ -42,6 +42,17 @@ func setupLogging(debug bool) {
 	logging.SetMemoryHandler(memoryHandler)
 }
 
+func setupServerLogging(debug bool) {
+	// Server mode: log to stdout with JSON format
+	level := slog.LevelInfo
+	if debug {
+		level = slog.LevelDebug
+	}
+	handler := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: level})
+	logger = slog.New(handler)
+	logging.SetLogger(logger)
+}
+
 func main() {
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: newsgoat [options] [command]\n\n")
@@ -262,8 +273,8 @@ func runServer(port int, apiKey, dbPath string, debug bool) error {
 		return fmt.Errorf("failed to run migrations: %w", err)
 	}
 
-	// Setup logging
-	setupLogging(debug)
+	// Setup JSON logging to stdout for server mode
+	setupServerLogging(debug)
 	logger.Info("Starting newsgoat gRPC server", "version", version.GetVersion(), "port", port)
 
 	// Create feed manager
@@ -341,7 +352,7 @@ func runClient(serverURL, apiKey string, debug bool) error {
 		cfg = config.GetDefaultConfig()
 	}
 
-	// Create task manager (but don't use it for feed refreshes in client mode)
+	// Create task manager
 	taskManager := tasks.NewManager(cfg.ReloadConcurrency)
 	ctx := context.Background()
 	if err := taskManager.Start(ctx); err != nil {
@@ -352,6 +363,13 @@ func runClient(serverURL, apiKey string, debug bool) error {
 			logger.Debug("Task manager already stopped", "error", stopErr)
 		}
 	}()
+
+	// Register feed refresh handler - the gRPC client implements FeedManager
+	// so refresh requests will be forwarded to the server
+	feedRefreshHandler := tasks.NewFeedRefreshHandler(client)
+	if err := taskManager.RegisterHandler(feedRefreshHandler); err != nil {
+		return fmt.Errorf("failed to register feed refresh handler: %w", err)
+	}
 
 	// Note: We pass the client as both the feed manager and settings manager interfaces
 	// The UI will call the client methods, which forward to the gRPC server

@@ -9,6 +9,7 @@ import (
 
 	"github.com/jarv/newsgoat/internal/database"
 	pb "github.com/jarv/newsgoat/internal/grpc/gen/newsgoat/v1"
+	"github.com/jarv/newsgoat/internal/logging"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
@@ -260,25 +261,6 @@ func pbSearchItemsGloballyToDb(item *pb.ItemWithReadStatus) database.SearchItems
 	if item.Item.CreatedAt != nil {
 		row.CreatedAt.Time = item.Item.CreatedAt.AsTime()
 		row.CreatedAt.Valid = true
-	}
-
-	return row
-}
-
-func pbLogMessageToDb(msg *pb.LogMessage) database.LogMessage {
-	row := database.LogMessage{
-		ID:      msg.Id,
-		Level:   msg.Level,
-		Message: msg.Message,
-	}
-
-	if msg.Timestamp != nil {
-		row.Timestamp.Time = msg.Timestamp.AsTime()
-		row.Timestamp.Valid = true
-	}
-	if msg.Details != "" {
-		row.Attributes.String = msg.Details
-		row.Attributes.Valid = true
 	}
 
 	return row
@@ -566,43 +548,38 @@ func (c *Client) AddLinkMarkersToHTML(content string) (string, []string) {
 	return content, []string{}
 }
 
-// Log operations
+// Log operations - use local client logs, not server logs
 
 func (c *Client) GetLogMessages(limit int64) ([]database.LogMessage, error) {
-	ctx, cancel := c.context()
-	defer cancel()
-
-	resp, err := c.feedClient.GetLogMessages(ctx, &pb.GetLogMessagesRequest{Limit: limit})
+	// Return local client logs from the in-memory handler
+	messages, err := logging.GetLogMessages(int(limit))
 	if err != nil {
 		return nil, err
 	}
 
-	messages := make([]database.LogMessage, len(resp.Messages))
-	for i, msg := range resp.Messages {
-		messages[i] = pbLogMessageToDb(msg)
+	result := make([]database.LogMessage, len(messages))
+	for i, msg := range messages {
+		result[i] = *msg
 	}
 
-	return messages, nil
+	return result, nil
 }
 
 func (c *Client) GetLogMessage(id int64) (database.LogMessage, error) {
-	ctx, cancel := c.context()
-	defer cancel()
-
-	resp, err := c.feedClient.GetLogMessage(ctx, &pb.GetLogMessageRequest{Id: id})
+	// Return local client log from the in-memory handler
+	msg, err := logging.GetLogMessage(id)
 	if err != nil {
 		return database.LogMessage{}, err
 	}
-
-	return pbLogMessageToDb(resp.Message), nil
+	if msg == nil {
+		return database.LogMessage{}, fmt.Errorf("log message not found: %d", id)
+	}
+	return *msg, nil
 }
 
 func (c *Client) DeleteAllLogMessages() error {
-	ctx, cancel := c.context()
-	defer cancel()
-
-	_, err := c.feedClient.DeleteAllLogMessages(ctx, &pb.DeleteAllLogMessagesRequest{})
-	return err
+	// Delete local client logs from the in-memory handler
+	return logging.DeleteAllLogMessages()
 }
 
 // Folder operations
