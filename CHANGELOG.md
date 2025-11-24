@@ -1,3 +1,10 @@
+## [2.0.6](https://github.com/jarv/newsgoat/compare/v2.0.5...v2.0.6) (2025-11-24)
+
+
+### Bug Fixes
+
+* Fix remote log handling so we only see client logs in logging view ([a7f788b](https://github.com/jarv/newsgoat/commit/a7f788bc7ed825bd4ad549bedb01f041156d82cf))
+
 ## [2.0.5](https://github.com/jarv/newsgoat/compare/v2.0.4...v2.0.5) (2025-11-24)
 
 
