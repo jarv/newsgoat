@@ -499,19 +499,42 @@ func (s *FeedService) IsItemRead(ctx context.Context, req *pb.IsItemReadRequest)
 // Folder operations
 
 func (s *FeedService) AddFeedFolder(ctx context.Context, req *pb.AddFeedFolderRequest) (*pb.AddFeedFolderResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "not implemented")
+	if err := s.manager.AddFeedFolder(req.FeedId, req.Folder); err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to add feed folder: %v", err)
+	}
+	return &pb.AddFeedFolderResponse{}, nil
 }
 
 func (s *FeedService) GetFeedFolders(ctx context.Context, req *pb.GetFeedFoldersRequest) (*pb.GetFeedFoldersResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "not implemented")
+	folders, err := s.manager.GetFeedFolders(req.FeedId)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to get feed folders: %v", err)
+	}
+	return &pb.GetFeedFoldersResponse{Folders: folders}, nil
 }
 
 func (s *FeedService) DeleteFeedFolders(ctx context.Context, req *pb.DeleteFeedFoldersRequest) (*pb.DeleteFeedFoldersResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "not implemented")
+	if err := s.manager.DeleteFeedFolders(req.FeedId); err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to delete feed folders: %v", err)
+	}
+	return &pb.DeleteFeedFoldersResponse{}, nil
 }
 
 func (s *FeedService) GetFolderStats(ctx context.Context, req *pb.GetFolderStatsRequest) (*pb.GetFolderStatsResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "not implemented")
+	stats, err := s.manager.GetFolderStats()
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to get folder stats: %v", err)
+	}
+
+	pbStats := make([]*pb.FolderStats, len(stats))
+	for i, stat := range stats {
+		pbStats[i] = &pb.FolderStats{
+			Name:        stat.FolderName,
+			TotalItems:  stat.TotalItems,
+			UnreadItems: stat.UnreadItems,
+		}
+	}
+	return &pb.GetFolderStatsResponse{Stats: pbStats}, nil
 }
 
 // Log operations

@@ -706,6 +706,35 @@ func (m *Manager) DeleteAllLogMessages() error {
 	return logging.DeleteAllLogMessages()
 }
 
+// Folder operations
+
+func (m *Manager) AddFeedFolder(feedID int64, folder string) error {
+	m.dbMutex.Lock()
+	defer m.dbMutex.Unlock()
+	return m.queries.AddFeedFolder(context.Background(), database.AddFeedFolderParams{
+		FeedID:     feedID,
+		FolderName: folder,
+	})
+}
+
+func (m *Manager) GetFeedFolders(feedID int64) ([]string, error) {
+	m.dbMutex.RLock()
+	defer m.dbMutex.RUnlock()
+	return m.queries.GetFeedFolders(context.Background(), feedID)
+}
+
+func (m *Manager) DeleteFeedFolders(feedID int64) error {
+	m.dbMutex.Lock()
+	defer m.dbMutex.Unlock()
+	return m.queries.DeleteFeedFolders(context.Background(), feedID)
+}
+
+func (m *Manager) GetFolderStats() ([]database.GetFolderStatsRow, error) {
+	m.dbMutex.RLock()
+	defer m.dbMutex.RUnlock()
+	return m.queries.GetFolderStats(context.Background())
+}
+
 func (m *Manager) recordFeedError(feedID int64, err error) {
 	if err == nil {
 		// Clear any previous error

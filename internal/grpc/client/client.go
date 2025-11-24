@@ -2,12 +2,15 @@ package client
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
+	"net/url"
 	"time"
 
 	"github.com/jarv/newsgoat/internal/database"
 	pb "github.com/jarv/newsgoat/internal/grpc/gen/newsgoat/v1"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
 )
@@ -28,11 +31,19 @@ type Client struct {
 }
 
 // NewClient creates a new gRPC client
+// serverURL can be:
+//   - host:port (e.g., "localhost:50051") - insecure connection
+//   - https://host (e.g., "https://newsgoat.jarv.org") - TLS connection on port 443
+//   - https://host:port - TLS connection on specified port
 func NewClient(serverURL, apiKey string) (*Client, error) {
-	// Create connection
+	target, creds, err := parseServerURL(serverURL)
+	if err != nil {
+		return nil, err
+	}
+
 	conn, err := grpc.NewClient(
-		serverURL,
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		target,
+		grpc.WithTransportCredentials(creds),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create client for %s: %w", serverURL, err)
@@ -45,6 +56,36 @@ func NewClient(serverURL, apiKey string) (*Client, error) {
 		apiKey:          apiKey,
 		serverURL:       serverURL,
 	}, nil
+}
+
+// parseServerURL parses the server URL and returns the gRPC target and credentials
+func parseServerURL(serverURL string) (string, credentials.TransportCredentials, error) {
+	// Try to parse as URL
+	u, err := url.Parse(serverURL)
+	if err != nil || u.Scheme == "" {
+		// Not a URL, treat as host:port with insecure connection
+		return serverURL, insecure.NewCredentials(), nil
+	}
+
+	switch u.Scheme {
+	case "https":
+		host := u.Host
+		if u.Port() == "" {
+			host = u.Hostname() + ":443"
+		}
+		tlsConfig := &tls.Config{
+			MinVersion: tls.VersionTLS12,
+		}
+		return host, credentials.NewTLS(tlsConfig), nil
+	case "http":
+		host := u.Host
+		if u.Port() == "" {
+			host = u.Hostname() + ":80"
+		}
+		return host, insecure.NewCredentials(), nil
+	default:
+		return "", nil, fmt.Errorf("unsupported URL scheme: %s (use http, https, or host:port)", u.Scheme)
+	}
 }
 
 // Close closes the gRPC connection
@@ -564,7 +605,83 @@ func (c *Client) DeleteAllLogMessages() error {
 	return err
 }
 
+// Folder operations
+
+func (c *Client) AddFeedFolder(feedID int64, folder string) error {
+	ctx, cancel := c.context()
+	defer cancel()
+
+	_, err := c.feedClient.AddFeedFolder(ctx, &pb.AddFeedFolderRequest{
+		FeedId: feedID,
+		Folder: folder,
+	})
+	return err
+}
+
+func (c *Client) GetFeedFolders(feedID int64) ([]string, error) {
+	ctx, cancel := c.context()
+	defer cancel()
+
+	resp, err := c.feedClient.GetFeedFolders(ctx, &pb.GetFeedFoldersRequest{FeedId: feedID})
+	if err != nil {
+		return nil, err
+	}
+	return resp.Folders, nil
+}
+
+func (c *Client) DeleteFeedFolders(feedID int64) error {
+	ctx, cancel := c.context()
+	defer cancel()
+
+	_, err := c.feedClient.DeleteFeedFolders(ctx, &pb.DeleteFeedFoldersRequest{FeedId: feedID})
+	return err
+}
+
+func (c *Client) GetFolderStats() ([]database.GetFolderStatsRow, error) {
+	ctx, cancel := c.context()
+	defer cancel()
+
+	resp, err := c.feedClient.GetFolderStats(ctx, &pb.GetFolderStatsRequest{})
+	if err != nil {
+		return nil, err
+	}
+
+	stats := make([]database.GetFolderStatsRow, len(resp.Stats))
+	for i, stat := range resp.Stats {
+		stats[i] = database.GetFolderStatsRow{
+			FolderName:  stat.Name,
+			TotalItems:  stat.TotalItems,
+			UnreadItems: stat.UnreadItems,
+		}
+	}
+	return stats, nil
+}
+
 // SetRefreshCallbacks is not supported in client mode (callbacks are server-side)
 func (c *Client) SetRefreshCallbacks(onStart, onComplete func(int64)) {
 	// No-op in client mode - callbacks only work in standalone mode
+}
+
+// Settings operations (implements config.SettingsManager)
+
+func (c *Client) GetSetting(key string) (string, error) {
+	ctx, cancel := c.context()
+	defer cancel()
+
+	resp, err := c.settingsClient.GetSetting(ctx, &pb.GetSettingRequest{Key: key})
+	if err != nil {
+		return "", err
+	}
+	return resp.Setting.Value, nil
+}
+
+func (c *Client) SetSetting(key, value string) error {
+	ctx, cancel := c.context()
+	defer cancel()
+
+	_, err := c.settingsClient.SetSetting(ctx, &pb.SetSettingRequest{
+		Key:   key,
+		Value: value,
+	})
+	return err
 }

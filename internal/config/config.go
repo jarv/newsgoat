@@ -1,10 +1,7 @@
 package config
 
 import (
-	"context"
 	"strconv"
-
-	"github.com/jarv/newsgoat/internal/database"
 )
 
 type Config struct {
@@ -52,68 +49,66 @@ func GetDefaultConfig() Config {
 	}
 }
 
-func LoadConfig(queries *database.Queries) (Config, error) {
+func LoadConfig(settings SettingsManager) (Config, error) {
 	defaults := GetDefaultConfig()
 	config := defaults
 
-	ctx := context.Background()
-
 	// Load reload_concurrency
-	if val, err := getSetting(queries, ctx, KeyReloadConcurrency); err == nil {
+	if val, err := settings.GetSetting(KeyReloadConcurrency); err == nil {
 		if intVal, err := strconv.Atoi(val); err == nil {
 			config.ReloadConcurrency = intVal
 		}
 	}
 
 	// Load reload_time
-	if val, err := getSetting(queries, ctx, KeyReloadTime); err == nil {
+	if val, err := settings.GetSetting(KeyReloadTime); err == nil {
 		if intVal, err := strconv.Atoi(val); err == nil {
 			config.ReloadTime = intVal
 		}
 	}
 
 	// Load auto_reload
-	if val, err := getSetting(queries, ctx, KeyAutoReload); err == nil {
+	if val, err := settings.GetSetting(KeyAutoReload); err == nil {
 		config.AutoReload = (val == "true" || val == "yes")
 	}
 
 	// Load suppress_first_reload
-	if val, err := getSetting(queries, ctx, KeySuppressFirstReload); err == nil {
+	if val, err := settings.GetSetting(KeySuppressFirstReload); err == nil {
 		config.SuppressFirstReload = (val == "true" || val == "yes")
 	}
 
 	// Load reload_on_startup
-	if val, err := getSetting(queries, ctx, KeyReloadOnStartup); err == nil {
+	if val, err := settings.GetSetting(KeyReloadOnStartup); err == nil {
 		config.ReloadOnStartup = (val == "true" || val == "yes")
 	}
 
 	// Load theme name
-	if val, err := getSetting(queries, ctx, KeyThemeName); err == nil {
+	if val, err := settings.GetSetting(KeyThemeName); err == nil {
 		config.ThemeName = val
 	}
 
 	// Load highlight style
-	if val, err := getSetting(queries, ctx, KeyHighlightStyle); err == nil {
+	if val, err := settings.GetSetting(KeyHighlightStyle); err == nil {
 		config.HighlightStyle = val
 	}
 
 	// Load spinner type
-	if val, err := getSetting(queries, ctx, KeySpinnerType); err == nil {
+	if val, err := settings.GetSetting(KeySpinnerType); err == nil {
 		config.SpinnerType = val
 	}
 
 	// Load show read feeds
-	if val, err := getSetting(queries, ctx, KeyShowReadFeeds); err == nil {
+	if val, err := settings.GetSetting(KeyShowReadFeeds); err == nil {
 		config.ShowReadFeeds = (val == "true" || val == "yes")
 	}
 
 	// Load unread on top
-	if val, err := getSetting(queries, ctx, KeyUnreadOnTop); err == nil {
+	if val, err := settings.GetSetting(KeyUnreadOnTop); err == nil {
 		config.UnreadOnTop = (val == "true" || val == "yes")
 	}
 
 	// Load check for updates
-	if val, err := getSetting(queries, ctx, KeyCheckForUpdates); err == nil {
+	if val, err := settings.GetSetting(KeyCheckForUpdates); err == nil {
 		config.CheckForUpdates = (val == "true" || val == "yes")
 	}
 
@@ -131,16 +126,14 @@ func LoadConfig(queries *database.Queries) (Config, error) {
 	return config, nil
 }
 
-func SaveConfig(queries *database.Queries, config Config) error {
-	ctx := context.Background()
-
+func SaveConfig(settings SettingsManager, config Config) error {
 	// Save reload_concurrency
-	if err := setSetting(queries, ctx, KeyReloadConcurrency, strconv.Itoa(config.ReloadConcurrency)); err != nil {
+	if err := settings.SetSetting(KeyReloadConcurrency, strconv.Itoa(config.ReloadConcurrency)); err != nil {
 		return err
 	}
 
 	// Save reload_time
-	if err := setSetting(queries, ctx, KeyReloadTime, strconv.Itoa(config.ReloadTime)); err != nil {
+	if err := settings.SetSetting(KeyReloadTime, strconv.Itoa(config.ReloadTime)); err != nil {
 		return err
 	}
 
@@ -149,7 +142,7 @@ func SaveConfig(queries *database.Queries, config Config) error {
 	if config.AutoReload {
 		autoReloadStr = "true"
 	}
-	if err := setSetting(queries, ctx, KeyAutoReload, autoReloadStr); err != nil {
+	if err := settings.SetSetting(KeyAutoReload, autoReloadStr); err != nil {
 		return err
 	}
 
@@ -158,7 +151,7 @@ func SaveConfig(queries *database.Queries, config Config) error {
 	if config.SuppressFirstReload {
 		suppressFirstReloadStr = "true"
 	}
-	if err := setSetting(queries, ctx, KeySuppressFirstReload, suppressFirstReloadStr); err != nil {
+	if err := settings.SetSetting(KeySuppressFirstReload, suppressFirstReloadStr); err != nil {
 		return err
 	}
 
@@ -167,22 +160,22 @@ func SaveConfig(queries *database.Queries, config Config) error {
 	if config.ReloadOnStartup {
 		reloadOnStartupStr = "true"
 	}
-	if err := setSetting(queries, ctx, KeyReloadOnStartup, reloadOnStartupStr); err != nil {
+	if err := settings.SetSetting(KeyReloadOnStartup, reloadOnStartupStr); err != nil {
 		return err
 	}
 
 	// Save theme name
-	if err := setSetting(queries, ctx, KeyThemeName, config.ThemeName); err != nil {
+	if err := settings.SetSetting(KeyThemeName, config.ThemeName); err != nil {
 		return err
 	}
 
 	// Save highlight style
-	if err := setSetting(queries, ctx, KeyHighlightStyle, config.HighlightStyle); err != nil {
+	if err := settings.SetSetting(KeyHighlightStyle, config.HighlightStyle); err != nil {
 		return err
 	}
 
 	// Save spinner type
-	if err := setSetting(queries, ctx, KeySpinnerType, config.SpinnerType); err != nil {
+	if err := settings.SetSetting(KeySpinnerType, config.SpinnerType); err != nil {
 		return err
 	}
 
@@ -191,7 +184,7 @@ func SaveConfig(queries *database.Queries, config Config) error {
 	if config.ShowReadFeeds {
 		showReadFeedsStr = "true"
 	}
-	if err := setSetting(queries, ctx, KeyShowReadFeeds, showReadFeedsStr); err != nil {
+	if err := settings.SetSetting(KeyShowReadFeeds, showReadFeedsStr); err != nil {
 		return err
 	}
 
@@ -200,7 +193,7 @@ func SaveConfig(queries *database.Queries, config Config) error {
 	if config.UnreadOnTop {
 		unreadOnTopStr = "true"
 	}
-	if err := setSetting(queries, ctx, KeyUnreadOnTop, unreadOnTopStr); err != nil {
+	if err := settings.SetSetting(KeyUnreadOnTop, unreadOnTopStr); err != nil {
 		return err
 	}
 
@@ -209,24 +202,9 @@ func SaveConfig(queries *database.Queries, config Config) error {
 	if config.CheckForUpdates {
 		checkForUpdatesStr = "true"
 	}
-	if err := setSetting(queries, ctx, KeyCheckForUpdates, checkForUpdatesStr); err != nil {
+	if err := settings.SetSetting(KeyCheckForUpdates, checkForUpdatesStr); err != nil {
 		return err
 	}
 
 	return nil
-}
-
-func getSetting(queries *database.Queries, ctx context.Context, key string) (string, error) {
-	setting, err := queries.GetSetting(ctx, key)
-	if err != nil {
-		return "", err
-	}
-	return setting.Value, nil
-}
-
-func setSetting(queries *database.Queries, ctx context.Context, key, value string) error {
-	return queries.SetSetting(ctx, database.SetSettingParams{
-		Key:   key,
-		Value: value,
-	})
 }

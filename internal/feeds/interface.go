@@ -44,6 +44,12 @@ type FeedManager interface {
 	GetLogMessage(id int64) (database.LogMessage, error)
 	DeleteAllLogMessages() error
 
+	// Folder operations
+	AddFeedFolder(feedID int64, folder string) error
+	GetFeedFolders(feedID int64) ([]string, error)
+	DeleteFeedFolders(feedID int64) error
+	GetFolderStats() ([]database.GetFolderStatsRow, error)
+
 	// Callbacks
 	SetRefreshCallbacks(onStart, onComplete func(int64))
 }

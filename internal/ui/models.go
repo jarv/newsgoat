@@ -1,7 +1,6 @@
 package ui
 
 import (
-	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -157,7 +156,7 @@ const (
 type Model struct {
 	feedManager                     feeds.FeedManager
 	taskManager                     tasks.Manager
-	queries                         *database.Queries
+	settingsManager                 config.SettingsManager
 	config                          config.Config
 	glamourRenderer                 *glamour.TermRenderer
 	state                           ViewState
@@ -396,7 +395,7 @@ func createGlamourRenderer(themeName string) (*glamour.TermRenderer, error) {
 	return renderer, nil
 }
 
-func NewModel(feedManager feeds.FeedManager, taskManager tasks.Manager, queries *database.Queries, cfg config.Config) Model {
+func NewModel(feedManager feeds.FeedManager, taskManager tasks.Manager, settingsManager config.SettingsManager, cfg config.Config) Model {
 	// Create glamour renderer based on theme
 	renderer, err := createGlamourRenderer(cfg.ThemeName)
 
@@ -408,7 +407,7 @@ func NewModel(feedManager feeds.FeedManager, taskManager tasks.Manager, queries 
 	return Model{
 		feedManager:          feedManager,
 		taskManager:          taskManager,
-		queries:              queries,
+		settingsManager:      settingsManager,
 		config:               cfg,
 		glamourRenderer:      renderer,
 		state:                FeedListView,
@@ -631,13 +630,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.statusMessage = "urls reloaded"
 		m.statusMessageType = "info"
 		// Sync feeds with the reloaded URLs
-		return m, syncFeedsWithURLs(m.feedManager, m.queries, msg.URLs)
+		return m, syncFeedsWithURLs(m.feedManager, msg.URLs)
 
 	case EditorFinishedMsg:
 		// After editor closes, sync feeds from temp file
 		m.statusMessage = "URLs synced from editor"
 		m.statusMessageType = "info"
-		return m, syncFeedsFromTempFile(m.feedManager, m.queries, msg.TempFilePath)
+		return m, syncFeedsFromTempFile(m.feedManager, msg.TempFilePath)
 
 	case EditorErrorMsg:
 		// Display error message
@@ -1030,7 +1029,7 @@ func (m Model) handleFeedListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				url := m.urlInput
 				m.addingURL = false
 				m.urlInput = ""
-				return m, addURLAndDiscover(m.feedManager, m.queries, url)
+				return m, addURLAndDiscover(m.feedManager, url)
 			}
 			// Empty input, just cancel
 			m.addingURL = false
@@ -1376,7 +1375,6 @@ func (m Model) handleFeedListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.refreshing = true
 				m.refreshStatus = "Refreshing folder..."
 
-				ctx := context.Background()
 				// Get all feeds
 				allFeeds, err := m.feedManager.GetAllFeeds()
 				if err != nil {
@@ -1387,11 +1385,7 @@ func (m Model) handleFeedListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 				// Find feeds in this folder and create tasks
 				for _, feed := range allFeeds {
-					var folders []string
-					var err error
-					if m.queries != nil {
-						folders, err = m.queries.GetFeedFolders(ctx, feed.ID)
-					}
+					folders, err := m.feedManager.GetFeedFolders(feed.ID)
 					if err == nil {
 						for _, folder := range folders {
 							if folder == item.FolderName {
@@ -1455,14 +1449,14 @@ func (m Model) handleFeedListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		// Open URLs file in editor
-		return m, openURLsFileInEditor(m.feedManager, m.queries)
+		return m, openURLsFileInEditor(m.feedManager)
 
 	case "i":
 		// Show feed info (only for feeds, not folders)
 		if len(m.feedList) > 0 && m.cursor < len(m.feedList) {
 			item := m.feedList[m.cursor]
 			if !item.IsFolder {
-				return m, loadFeedInfo(m.queries, item.Feed.ID)
+				return m, loadFeedInfo(m.feedManager, item.Feed.ID)
 			}
 		}
 
@@ -1472,7 +1466,7 @@ func (m Model) handleFeedListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			item := m.feedList[m.cursor]
 			if item.IsFolder {
 				// Mark all feeds in this folder as read
-				return m, markAllItemsReadInFolder(m.feedManager, m.queries, item.FolderName)
+				return m, markAllItemsReadInFolder(m.feedManager, item.FolderName)
 			} else {
 				// Mark all items in single feed as read
 				return m, markAllItemsReadInFeed(m.feedManager, item.Feed.ID)
@@ -2007,19 +2001,13 @@ func (m Model) getUnreadStyle() lipgloss.Style {
 
 // buildFeedDisplayList creates a flat list of folders and feeds for display
 func (m *Model) buildFeedDisplayList(feeds []database.GetFeedStatsRow) {
-	ctx := context.Background()
-
 	// Group feeds by folders
 	feedsByFolder := make(map[string][]database.GetFeedStatsRow)
 	feedsWithoutFolders := []database.GetFeedStatsRow{}
 
 	for _, feed := range feeds {
 		// Get folders for this feed
-		var folders []string
-		var err error
-		if m.queries != nil {
-			folders, err = m.queries.GetFeedFolders(ctx, feed.ID)
-		}
+		folders, err := m.feedManager.GetFeedFolders(feed.ID)
 		if err != nil || len(folders) == 0 {
 			// Feed has no folders
 			feedsWithoutFolders = append(feedsWithoutFolders, feed)
@@ -3516,7 +3504,7 @@ func (m Model) handleSettingsViewKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			// Apply the selected theme
 			themeNames := themes.GetThemeNames()
 			m.config.ThemeName = themeNames[m.themeSelectCursor]
-			if err := config.SaveConfig(m.queries, m.config); err != nil {
+			if err := config.SaveConfig(m.settingsManager, m.config); err != nil {
 				m.err = err
 			}
 
@@ -3557,7 +3545,7 @@ func (m Model) handleSettingsViewKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			// Apply the selected highlight style
 			highlightStyles := themes.GetHighlightStyles()
 			m.config.HighlightStyle = highlightStyles[m.highlightSelectCursor]
-			if err := config.SaveConfig(m.queries, m.config); err != nil {
+			if err := config.SaveConfig(m.settingsManager, m.config); err != nil {
 				m.err = err
 			}
 
@@ -3592,7 +3580,7 @@ func (m Model) handleSettingsViewKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			// Apply the selected spinner type
 			spinnerTypes := themes.GetSpinnerTypes()
 			m.config.SpinnerType = spinnerTypes[m.spinnerSelectCursor]
-			if err := config.SaveConfig(m.queries, m.config); err != nil {
+			if err := config.SaveConfig(m.settingsManager, m.config); err != nil {
 				m.err = err
 			}
 
@@ -3620,7 +3608,7 @@ func (m Model) handleSettingsViewKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		case "enter":
 			m.config.ShowReadFeeds = (m.showReadFeedsSelectCursor == 0)
-			if err := config.SaveConfig(m.queries, m.config); err != nil {
+			if err := config.SaveConfig(m.settingsManager, m.config); err != nil {
 				m.err = err
 			}
 			m.selectingShowReadFeeds = false
@@ -3647,7 +3635,7 @@ func (m Model) handleSettingsViewKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		case "enter":
 			m.config.AutoReload = (m.autoReloadSelectCursor == 0)
-			if err := config.SaveConfig(m.queries, m.config); err != nil {
+			if err := config.SaveConfig(m.settingsManager, m.config); err != nil {
 				m.err = err
 			}
 			m.selectingAutoReload = false
@@ -3674,7 +3662,7 @@ func (m Model) handleSettingsViewKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		case "enter":
 			m.config.SuppressFirstReload = (m.suppressFirstReloadSelectCursor == 0)
-			if err := config.SaveConfig(m.queries, m.config); err != nil {
+			if err := config.SaveConfig(m.settingsManager, m.config); err != nil {
 				m.err = err
 			}
 			m.selectingSuppressFirstReload = false
@@ -3701,7 +3689,7 @@ func (m Model) handleSettingsViewKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		case "enter":
 			m.config.ReloadOnStartup = (m.reloadOnStartupSelectCursor == 0)
-			if err := config.SaveConfig(m.queries, m.config); err != nil {
+			if err := config.SaveConfig(m.settingsManager, m.config); err != nil {
 				m.err = err
 			}
 			m.selectingReloadOnStartup = false
@@ -3728,7 +3716,7 @@ func (m Model) handleSettingsViewKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		case "enter":
 			m.config.UnreadOnTop = (m.unreadOnTopSelectCursor == 0)
-			if err := config.SaveConfig(m.queries, m.config); err != nil {
+			if err := config.SaveConfig(m.settingsManager, m.config); err != nil {
 				m.err = err
 			}
 			m.selectingUnreadOnTop = false
@@ -3755,7 +3743,7 @@ func (m Model) handleSettingsViewKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		case "enter":
 			m.config.CheckForUpdates = (m.checkForUpdatesSelectCursor == 0)
-			if err := config.SaveConfig(m.queries, m.config); err != nil {
+			if err := config.SaveConfig(m.settingsManager, m.config); err != nil {
 				m.err = err
 			}
 			m.selectingCheckForUpdates = false
@@ -3784,7 +3772,7 @@ func (m Model) handleSettingsViewKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				if val, parseErr := strconv.Atoi(m.settingInput); parseErr == nil {
 					if val >= 1 && val <= 10 {
 						m.config.ReloadConcurrency = val
-						if err := config.SaveConfig(m.queries, m.config); err != nil {
+						if err := config.SaveConfig(m.settingsManager, m.config); err != nil {
 							m.err = err
 						}
 					}
@@ -3794,7 +3782,7 @@ func (m Model) handleSettingsViewKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				if val, parseErr := strconv.Atoi(m.settingInput); parseErr == nil {
 					if val >= 0 {
 						m.config.ReloadTime = val
-						if err := config.SaveConfig(m.queries, m.config); err != nil {
+						if err := config.SaveConfig(m.settingsManager, m.config); err != nil {
 							m.err = err
 						}
 						// If reload time changed, restart the timer

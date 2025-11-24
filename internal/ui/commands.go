@@ -1,7 +1,6 @@
 package ui
 
 import (
-	"context"
 	"os"
 	"os/exec"
 	"runtime"
@@ -144,10 +143,8 @@ func markAllItemsReadInFeed(feedManager feeds.FeedManager, feedID int64) tea.Cmd
 	}
 }
 
-func markAllItemsReadInFolder(feedManager feeds.FeedManager, queries *database.Queries, folderName string) tea.Cmd {
+func markAllItemsReadInFolder(feedManager feeds.FeedManager, folderName string) tea.Cmd {
 	return func() tea.Msg {
-		ctx := context.Background()
-
 		// Get all feeds in this folder
 		allFeeds, err := feedManager.GetAllFeeds()
 		if err != nil {
@@ -158,7 +155,7 @@ func markAllItemsReadInFolder(feedManager feeds.FeedManager, queries *database.Q
 		// Mark all items in each feed as read
 		for _, feed := range allFeeds {
 			// Check if this feed is in the folder
-			folders, err := queries.GetFeedFolders(ctx, feed.ID)
+			folders, err := feedManager.GetFeedFolders(feed.ID)
 			if err != nil {
 				continue
 			}
@@ -265,9 +262,9 @@ func quitApp(taskManager tasks.Manager) tea.Cmd {
 	}
 }
 
-func loadFeedInfo(queries *database.Queries, feedID int64) tea.Cmd {
+func loadFeedInfo(feedManager feeds.FeedManager, feedID int64) tea.Cmd {
 	return func() tea.Msg {
-		feed, err := queries.GetFeed(context.Background(), feedID)
+		feed, err := feedManager.GetFeed(feedID)
 		if err != nil {
 			logging.Error("loadFeedInfo failed", "feedID", feedID, "error", err)
 			return ErrorMsg{Err: err}
@@ -276,7 +273,7 @@ func loadFeedInfo(queries *database.Queries, feedID int64) tea.Cmd {
 	}
 }
 
-func openURLsFileInEditor(feedManager feeds.FeedManager, queries *database.Queries) tea.Cmd {
+func openURLsFileInEditor(feedManager feeds.FeedManager) tea.Cmd {
 	editor := config.GetEditor()
 	if editor == "" {
 		return func() tea.Msg {
@@ -285,8 +282,6 @@ func openURLsFileInEditor(feedManager feeds.FeedManager, queries *database.Queri
 	}
 
 	return func() tea.Msg {
-		ctx := context.Background()
-
 		// Get all feeds from database
 		allFeeds, err := feedManager.GetAllFeeds()
 		if err != nil {
@@ -303,7 +298,7 @@ func openURLsFileInEditor(feedManager feeds.FeedManager, queries *database.Queri
 			}
 
 			// Get folders for this feed
-			folders, err := queries.GetFeedFolders(ctx, feed.ID)
+			folders, err := feedManager.GetFeedFolders(feed.ID)
 			if err != nil {
 				logging.Warn("Failed to get folders for feed", "feedID", feed.ID, "error", err)
 				folders = []string{} // Continue with empty folders
@@ -334,10 +329,8 @@ func openURLsFileInEditor(feedManager feeds.FeedManager, queries *database.Queri
 	}
 }
 
-func addURLAndDiscover(feedManager feeds.FeedManager, queries *database.Queries, input string) tea.Cmd {
+func addURLAndDiscover(feedManager feeds.FeedManager, input string) tea.Cmd {
 	return func() tea.Msg {
-		ctx := context.Background()
-
 		// Parse input: URL followed by optional folders
 		// Format: <url> folder1,folder2 or <url> "folder with spaces",folder3
 		parts := strings.Fields(input)
@@ -378,21 +371,18 @@ func addURLAndDiscover(feedManager feeds.FeedManager, queries *database.Queries,
 				}
 
 				// Get the feed from database
-				feed, err := queries.GetFeedByURL(ctx, feedURL)
+				feed, err := feedManager.GetFeedByURL(feedURL)
 				if err != nil {
 					logging.Warn("Failed to get feed for folder update", "url", feedURL, "error", err)
 				} else {
 					// Delete existing folders
-					if err := queries.DeleteFeedFolders(ctx, feed.ID); err != nil {
+					if err := feedManager.DeleteFeedFolders(feed.ID); err != nil {
 						logging.Warn("Failed to delete old folders", "feed_id", feed.ID, "error", err)
 					}
 
 					// Add new folders
 					for _, folder := range entry.Folders {
-						if err := queries.AddFeedFolder(ctx, database.AddFeedFolderParams{
-							FeedID:     feed.ID,
-							FolderName: folder,
-						}); err != nil {
+						if err := feedManager.AddFeedFolder(feed.ID, folder); err != nil {
 							logging.Warn("Failed to add folder", "feed_id", feed.ID, "folder", folder, "error", err)
 						}
 					}
@@ -404,10 +394,8 @@ func addURLAndDiscover(feedManager feeds.FeedManager, queries *database.Queries,
 	}
 }
 
-func syncFeedsWithURLs(feedManager feeds.FeedManager, queries *database.Queries, urlEntries []config.URLEntry) tea.Cmd {
+func syncFeedsWithURLs(feedManager feeds.FeedManager, urlEntries []config.URLEntry) tea.Cmd {
 	return func() tea.Msg {
-		ctx := context.Background()
-
 		// Get all feeds from database
 		allFeeds, err := feedManager.GetAllFeeds()
 		if err != nil {
@@ -446,7 +434,7 @@ func syncFeedsWithURLs(feedManager feeds.FeedManager, queries *database.Queries,
 					continue
 				}
 				// Get feed ID
-				feed, err := queries.GetFeedByURL(ctx, entry.URL)
+				feed, err := feedManager.GetFeedByURL(entry.URL)
 				if err != nil {
 					logging.Warn("Failed to get feed by URL", "url", entry.URL, "error", err)
 					continue
@@ -459,7 +447,7 @@ func syncFeedsWithURLs(feedManager feeds.FeedManager, queries *database.Queries,
 					continue
 				}
 				// Get the newly created feed ID
-				feed, err := queries.GetFeedByURL(ctx, entry.URL)
+				feed, err := feedManager.GetFeedByURL(entry.URL)
 				if err != nil {
 					logging.Warn("Failed to get newly created feed", "url", entry.URL, "error", err)
 					continue
@@ -469,16 +457,13 @@ func syncFeedsWithURLs(feedManager feeds.FeedManager, queries *database.Queries,
 
 			// Update folders for this feed
 			// First, delete existing folders
-			if err := queries.DeleteFeedFolders(ctx, feedID); err != nil {
+			if err := feedManager.DeleteFeedFolders(feedID); err != nil {
 				logging.Warn("Failed to delete old folders", "feed_id", feedID, "error", err)
 			}
 
 			// Then add new folders
 			for _, folder := range entry.Folders {
-				if err := queries.AddFeedFolder(ctx, database.AddFeedFolderParams{
-					FeedID:     feedID,
-					FolderName: folder,
-				}); err != nil {
+				if err := feedManager.AddFeedFolder(feedID, folder); err != nil {
 					logging.Warn("Failed to add folder", "feed_id", feedID, "folder", folder, "error", err)
 				}
 			}
@@ -489,7 +474,7 @@ func syncFeedsWithURLs(feedManager feeds.FeedManager, queries *database.Queries,
 	}
 }
 
-func syncFeedsFromTempFile(feedManager feeds.FeedManager, queries *database.Queries, tempFilePath string) tea.Cmd {
+func syncFeedsFromTempFile(feedManager feeds.FeedManager, tempFilePath string) tea.Cmd {
 	return func() tea.Msg {
 		// Read URLs from temp file
 		urlEntries, err := config.ReadURLsFileFromPath(tempFilePath)
@@ -505,7 +490,7 @@ func syncFeedsFromTempFile(feedManager feeds.FeedManager, queries *database.Quer
 		}
 
 		// Sync feeds with the URLs from temp file
-		return syncFeedsWithURLs(feedManager, queries, urlEntries)()
+		return syncFeedsWithURLs(feedManager, urlEntries)()
 	}
 }
 

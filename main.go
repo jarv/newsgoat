@@ -193,8 +193,11 @@ func run(debug bool) error {
 		return fmt.Errorf("failed to run migrations: %w", err)
 	}
 
+	// Create settings manager
+	settingsManager := config.NewLocalSettingsManager(queries)
+
 	// Load configuration from database
-	cfg, err := config.LoadConfig(queries)
+	cfg, err := config.LoadConfig(settingsManager)
 	if err != nil {
 		fmt.Printf("Failed to load config, using defaults: %v\n", err)
 		cfg = config.GetDefaultConfig()
@@ -228,7 +231,7 @@ func run(debug bool) error {
 		return fmt.Errorf("failed to register feed refresh handler: %w", err)
 	}
 
-	model := ui.NewModel(feedManager, taskManager, queries, cfg)
+	model := ui.NewModel(feedManager, taskManager, settingsManager, cfg)
 	p := tea.NewProgram(model, tea.WithAltScreen())
 
 	if _, err := p.Run(); err != nil {
@@ -331,8 +334,12 @@ func runClient(serverURL, apiKey string, debug bool) error {
 	// Setup in-memory logging (no local database needed in client mode)
 	setupLogging(debug)
 
-	// Use default configuration in client mode
-	cfg := config.GetDefaultConfig()
+	// Load configuration from server (client implements SettingsManager)
+	cfg, err := config.LoadConfig(client)
+	if err != nil {
+		fmt.Printf("Failed to load config from server, using defaults: %v\n", err)
+		cfg = config.GetDefaultConfig()
+	}
 
 	// Create task manager (but don't use it for feed refreshes in client mode)
 	taskManager := tasks.NewManager(cfg.ReloadConcurrency)
@@ -346,10 +353,9 @@ func runClient(serverURL, apiKey string, debug bool) error {
 		}
 	}()
 
-	// Note: We pass the client as the manager interface to the UI
+	// Note: We pass the client as both the feed manager and settings manager interfaces
 	// The UI will call the client methods, which forward to the gRPC server
-	// No local database needed in client mode - queries is nil
-	model := ui.NewModel(client, taskManager, nil, cfg)
+	model := ui.NewModel(client, taskManager, client, cfg)
 	p := tea.NewProgram(model, tea.WithAltScreen())
 
 	if _, err := p.Run(); err != nil {
