@@ -1,3 +1,10 @@
+## [2.0.3](https://github.com/jarv/newsgoat/compare/v2.0.2...v2.0.3) (2025-11-24)
+
+
+### Bug Fixes
+
+* adds some info logging for server mode ([9ee2f5f](https://github.com/jarv/newsgoat/commit/9ee2f5f83377086d2559928c39c3541994380dfe))
+
 ## [2.0.2](https://github.com/jarv/newsgoat/compare/v2.0.1...v2.0.2) (2025-11-21)
 
 
