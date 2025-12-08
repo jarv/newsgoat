@@ -1,3 +1,10 @@
+## [2.0.10](https://github.com/jarv/newsgoat/compare/v2.0.9...v2.0.10) (2025-12-08)
+
+
+### Bug Fixes
+
+* **deps:** update module golang.org/x/net to v0.48.0 ([#60](https://github.com/jarv/newsgoat/issues/60)) ([464c1cc](https://github.com/jarv/newsgoat/commit/464c1cc7fe991a199c09d1b0c5143daf23317834))
+
 ## [2.0.9](https://github.com/jarv/newsgoat/compare/v2.0.8...v2.0.9) (2025-12-02)
 
 
