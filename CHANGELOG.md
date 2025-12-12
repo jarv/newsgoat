@@ -1,3 +1,10 @@
+## [2.0.11](https://github.com/jarv/newsgoat/compare/v2.0.10...v2.0.11) (2025-12-12)
+
+
+### Bug Fixes
+
+* **deps:** update module google.golang.org/protobuf to v1.36.11 ([#62](https://github.com/jarv/newsgoat/issues/62)) ([ad4214f](https://github.com/jarv/newsgoat/commit/ad4214fc20585301aa2779e6e534ea3cf1d55450))
+
 ## [2.0.10](https://github.com/jarv/newsgoat/compare/v2.0.9...v2.0.10) (2025-12-08)
 
 
