@@ -1,3 +1,10 @@
+## [2.0.13](https://github.com/jarv/newsgoat/compare/v2.0.12...v2.0.13) (2025-12-23)
+
+
+### Bug Fixes
+
+* **deps:** update module google.golang.org/grpc to v1.78.0 ([#67](https://github.com/jarv/newsgoat/issues/67)) ([43ce41a](https://github.com/jarv/newsgoat/commit/43ce41a6bc8d722949031a2330dde7f6accaa71b))
+
 ## [2.0.12](https://github.com/jarv/newsgoat/compare/v2.0.11...v2.0.12) (2025-12-19)
 
 
