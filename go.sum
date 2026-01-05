@@ -30,6 +30,8 @@ github.com/charmbracelet/lipgloss v1.1.1-0.20251103205207-7d1b622c64d1 h1:juDMsL
 github.com/charmbracelet/lipgloss v1.1.1-0.20251103205207-7d1b622c64d1/go.mod h1:MWPTRKv6ao34yDBSocETWE/AawQ3K+q7rs+0kzyfxzo=
 github.com/charmbracelet/lipgloss v1.1.1-0.20251124114052-fabd8ab649bd h1:kWKqWolTiFi6f61n5XZ5wD5FawOeiJLKYm6fz0kb3bU=
 github.com/charmbracelet/lipgloss v1.1.1-0.20251124114052-fabd8ab649bd/go.mod h1:MWPTRKv6ao34yDBSocETWE/AawQ3K+q7rs+0kzyfxzo=
+github.com/charmbracelet/lipgloss v1.1.1-0.20260105145153-f2d1864a58cd h1:WA/CO7bk+Axe0sH11hetJIjW2KkBP6eVvh1kRlCwgsY=
+github.com/charmbracelet/lipgloss v1.1.1-0.20260105145153-f2d1864a58cd/go.mod h1:D4YudnJlpIa3bcKpFSigAEWd31pQMgYu3pFE94b/1mc=
 github.com/charmbracelet/x/ansi v0.10.2 h1:ith2ArZS0CJG30cIUfID1LXN7ZFXRCww6RUvAPA+Pzw=
 github.com/charmbracelet/x/ansi v0.10.2/go.mod h1:HbLdJjQH4UH4AqA2HpRWuWNluRE6zxJH/yteYEYCFa8=
 github.com/charmbracelet/x/cellbuf v0.0.13 h1:/KBBKHuVRbq1lYx5BzEHBAFBP8VcQzJejZ/IA3iR28k=
@@ -40,6 +42,12 @@ github.com/charmbracelet/x/exp/slice v0.0.0-20250327172914-2fdc97757edf h1:rLG0Y
 github.com/charmbracelet/x/exp/slice v0.0.0-20250327172914-2fdc97757edf/go.mod h1:B3UgsnsBZS/eX42BlaNiJkD1pPOUa+oF1IYC6Yd2CEU=
 github.com/charmbracelet/x/term v0.2.1 h1:AQeHeLZ1OqSXhrAWpYUtZyX1T3zVxfpZuEQMIQaGIAQ=
 github.com/charmbracelet/x/term v0.2.1/go.mod h1:oQ4enTYFV7QN4m0i9mzHrViD7TQKvNEEkHUMCmsxdUg=
+github.com/clipperhouse/displaywidth v0.6.2 h1:ZDpTkFfpHOKte4RG5O/BOyf3ysnvFswpyYrV7z2uAKo=
+github.com/clipperhouse/displaywidth v0.6.2/go.mod h1:R+kHuzaYWFkTm7xoMmK1lFydbci4X2CicfbGstSGg0o=
+github.com/clipperhouse/stringish v0.1.1 h1:+NSqMOr3GR6k1FdRhhnXrLfztGzuG+VuFDfatpWHKCs=
+github.com/clipperhouse/stringish v0.1.1/go.mod h1:v/WhFtE1q0ovMta2+m+UbpZ+2/HEXNWYXQgCt4hdOzA=
+github.com/clipperhouse/uax29/v2 v2.3.0 h1:SNdx9DVUqMoBuBoW3iLOj4FQv3dN5mDtuqwuhIGpJy4=
+github.com/clipperhouse/uax29/v2 v2.3.0/go.mod h1:Wn1g7MK6OoeDT0vL+Q0SQLDz/KpfsVRgg6W7ihQeh4g=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
