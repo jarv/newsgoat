@@ -1,3 +1,18 @@
+# [3.0.0](https://github.com/jarv/newsgoat/compare/v2.0.14...v3.0.0) (2026-01-08)
+
+
+### Features
+
+* Removes client/server mode ([a1f9d56](https://github.com/jarv/newsgoat/commit/a1f9d5629acb6dee948004e5a57423adf541450d))
+
+
+### BREAKING CHANGES
+
+* this reverts client/server implementation
+
+The client/server implementation needs to be refactored, for now it will
+be backed out.
+
 ## [2.0.14](https://github.com/jarv/newsgoat/compare/v2.0.13...v2.0.14) (2026-01-05)
 
 
