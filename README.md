@@ -60,63 +60,15 @@ This will extract the `channel_id` and subscribe to the channel RSS feed.
 
 If you know of any other terminal-based RSS readers worth mentioning here please add them!
 
-## Operating Modes
+## Configure
 
-NewsGoat supports three operating modes:
-
-### Standalone Mode (Default)
-
-Run NewsGoat with a local SQLite database at `~/.config/newsgoat/newsgoat.db`:
+NewsGoat runs with a local SQLite database at `~/.config/newsgoat/newsgoat.db`. Simply run:
 
 ```bash
 newsgoat
 ```
 
-This is the default mode where everything runs locally on your machine.
-
-### Client/Server Mode
-
-NewsGoat can run in a client/server architecture, useful for:
-- Sharing a single feed database across multiple devices
-- Running the server on a remote machine or home server
-- Keeping feed refresh operations on the server while accessing from multiple clients
-
-#### Server Mode
-
-Start a gRPC server that manages the database and feed operations:
-
-```bash
-export NEWSGOAT_API_KEY="your-secret-api-key"
-newsgoat --mode=server --server-port=50051 --db=/path/to/newsgoat.db
-```
-
-Options:
-- `--server-port`: Port for the gRPC server (default: 50051)
-- `--db`: Path to the SQLite database file (optional, defaults to `~/.config/newsgoat/newsgoat.db`)
-- `NEWSGOAT_API_KEY`: Environment variable for API authentication (required)
-
-#### Client Mode
-
-Connect to a remote NewsGoat server:
-
-```bash
-export NEWSGOAT_API_KEY="your-secret-api-key"
-newsgoat --mode=client --server-url=localhost:50051
-```
-
-Options:
-- `--server-url`: Address of the gRPC server (required)
-- `NEWSGOAT_API_KEY`: Environment variable for API authentication (optional, but required if server uses authentication)
-
-In client mode:
-- No local database is needed
-- All feed operations are performed on the server
-- Multiple clients can connect to the same server simultaneously
-- Feed refreshes happen on the server, keeping all clients in sync
-
-## Configure
-
-NewsGoat stores feed URLs in a local SQLite database (`~/.config/newsgoat/newsgoat.db` by default). You can add and manage feeds through the UI (see "Add Feed URLs" section below).
+You can add and manage feeds through the UI (see "Add Feed URLs" section below).
 
 ## Development
 
