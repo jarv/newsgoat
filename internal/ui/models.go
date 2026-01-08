@@ -154,9 +154,9 @@ const (
 )
 
 type Model struct {
-	feedManager                     feeds.FeedManager
+	feedManager                     *feeds.Manager
 	taskManager                     tasks.Manager
-	settingsManager                 config.SettingsManager
+	queries                         *database.Queries
 	config                          config.Config
 	glamourRenderer                 *glamour.TermRenderer
 	state                           ViewState
@@ -396,7 +396,7 @@ func createGlamourRenderer(themeName string) (*glamour.TermRenderer, error) {
 	return renderer, nil
 }
 
-func NewModel(feedManager feeds.FeedManager, taskManager tasks.Manager, settingsManager config.SettingsManager, cfg config.Config) Model {
+func NewModel(feedManager *feeds.Manager, taskManager tasks.Manager, queries *database.Queries, cfg config.Config) Model {
 	// Create glamour renderer based on theme
 	renderer, err := createGlamourRenderer(cfg.ThemeName)
 
@@ -408,7 +408,7 @@ func NewModel(feedManager feeds.FeedManager, taskManager tasks.Manager, settings
 	return Model{
 		feedManager:          feedManager,
 		taskManager:          taskManager,
-		settingsManager:      settingsManager,
+		queries:              queries,
 		config:               cfg,
 		glamourRenderer:      renderer,
 		state:                FeedListView,
@@ -3500,7 +3500,7 @@ func (m Model) handleSettingsViewKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			// Apply the selected theme
 			themeNames := themes.GetThemeNames()
 			m.config.ThemeName = themeNames[m.themeSelectCursor]
-			if err := config.SaveConfig(m.settingsManager, m.config); err != nil {
+			if err := config.SaveConfig(m.queries, m.config); err != nil {
 				m.err = err
 			}
 
@@ -3541,7 +3541,7 @@ func (m Model) handleSettingsViewKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			// Apply the selected highlight style
 			highlightStyles := themes.GetHighlightStyles()
 			m.config.HighlightStyle = highlightStyles[m.highlightSelectCursor]
-			if err := config.SaveConfig(m.settingsManager, m.config); err != nil {
+			if err := config.SaveConfig(m.queries, m.config); err != nil {
 				m.err = err
 			}
 
@@ -3576,7 +3576,7 @@ func (m Model) handleSettingsViewKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			// Apply the selected spinner type
 			spinnerTypes := themes.GetSpinnerTypes()
 			m.config.SpinnerType = spinnerTypes[m.spinnerSelectCursor]
-			if err := config.SaveConfig(m.settingsManager, m.config); err != nil {
+			if err := config.SaveConfig(m.queries, m.config); err != nil {
 				m.err = err
 			}
 
@@ -3604,7 +3604,7 @@ func (m Model) handleSettingsViewKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		case "enter":
 			m.config.ShowReadFeeds = (m.showReadFeedsSelectCursor == 0)
-			if err := config.SaveConfig(m.settingsManager, m.config); err != nil {
+			if err := config.SaveConfig(m.queries, m.config); err != nil {
 				m.err = err
 			}
 			m.selectingShowReadFeeds = false
@@ -3631,7 +3631,7 @@ func (m Model) handleSettingsViewKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		case "enter":
 			m.config.AutoReload = (m.autoReloadSelectCursor == 0)
-			if err := config.SaveConfig(m.settingsManager, m.config); err != nil {
+			if err := config.SaveConfig(m.queries, m.config); err != nil {
 				m.err = err
 			}
 			m.selectingAutoReload = false
@@ -3658,7 +3658,7 @@ func (m Model) handleSettingsViewKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		case "enter":
 			m.config.SuppressFirstReload = (m.suppressFirstReloadSelectCursor == 0)
-			if err := config.SaveConfig(m.settingsManager, m.config); err != nil {
+			if err := config.SaveConfig(m.queries, m.config); err != nil {
 				m.err = err
 			}
 			m.selectingSuppressFirstReload = false
@@ -3685,7 +3685,7 @@ func (m Model) handleSettingsViewKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		case "enter":
 			m.config.ReloadOnStartup = (m.reloadOnStartupSelectCursor == 0)
-			if err := config.SaveConfig(m.settingsManager, m.config); err != nil {
+			if err := config.SaveConfig(m.queries, m.config); err != nil {
 				m.err = err
 			}
 			m.selectingReloadOnStartup = false
@@ -3712,7 +3712,7 @@ func (m Model) handleSettingsViewKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		case "enter":
 			m.config.UnreadOnTop = (m.unreadOnTopSelectCursor == 0)
-			if err := config.SaveConfig(m.settingsManager, m.config); err != nil {
+			if err := config.SaveConfig(m.queries, m.config); err != nil {
 				m.err = err
 			}
 			m.selectingUnreadOnTop = false
@@ -3739,7 +3739,7 @@ func (m Model) handleSettingsViewKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		case "enter":
 			m.config.CheckForUpdates = (m.checkForUpdatesSelectCursor == 0)
-			if err := config.SaveConfig(m.settingsManager, m.config); err != nil {
+			if err := config.SaveConfig(m.queries, m.config); err != nil {
 				m.err = err
 			}
 			m.selectingCheckForUpdates = false
@@ -3768,7 +3768,7 @@ func (m Model) handleSettingsViewKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				if val, parseErr := strconv.Atoi(m.settingInput); parseErr == nil {
 					if val >= 1 && val <= 10 {
 						m.config.ReloadConcurrency = val
-						if err := config.SaveConfig(m.settingsManager, m.config); err != nil {
+						if err := config.SaveConfig(m.queries, m.config); err != nil {
 							m.err = err
 						}
 					}
@@ -3778,7 +3778,7 @@ func (m Model) handleSettingsViewKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				if val, parseErr := strconv.Atoi(m.settingInput); parseErr == nil {
 					if val >= 0 {
 						m.config.ReloadTime = val
-						if err := config.SaveConfig(m.settingsManager, m.config); err != nil {
+						if err := config.SaveConfig(m.queries, m.config); err != nil {
 							m.err = err
 						}
 						// If reload time changed, restart the timer

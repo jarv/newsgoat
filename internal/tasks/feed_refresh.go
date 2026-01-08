@@ -17,11 +17,11 @@ type FeedRefreshTaskData struct {
 
 // FeedRefreshHandler handles feed refresh tasks
 type FeedRefreshHandler struct {
-	feedManager feeds.FeedManager
+	feedManager *feeds.Manager
 }
 
 // NewFeedRefreshHandler creates a new feed refresh handler
-func NewFeedRefreshHandler(feedManager feeds.FeedManager) *FeedRefreshHandler {
+func NewFeedRefreshHandler(feedManager *feeds.Manager) *FeedRefreshHandler {
 	return &FeedRefreshHandler{
 		feedManager: feedManager,
 	}

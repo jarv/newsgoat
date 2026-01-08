@@ -1,7 +1,10 @@
 package config
 
 import (
+	"context"
 	"strconv"
+
+	"github.com/jarv/newsgoat/internal/database"
 )
 
 type Config struct {
@@ -49,67 +52,67 @@ func GetDefaultConfig() Config {
 	}
 }
 
-func LoadConfig(settings SettingsManager) (Config, error) {
+func LoadConfig(queries *database.Queries) (Config, error) {
 	defaults := GetDefaultConfig()
 	config := defaults
 
 	// Load reload_concurrency
-	if val, err := settings.GetSetting(KeyReloadConcurrency); err == nil {
-		if intVal, err := strconv.Atoi(val); err == nil {
+	if val, err := queries.GetSetting(context.Background(), KeyReloadConcurrency); err == nil {
+		if intVal, err := strconv.Atoi(val.Value); err == nil {
 			config.ReloadConcurrency = intVal
 		}
 	}
 
 	// Load reload_time
-	if val, err := settings.GetSetting(KeyReloadTime); err == nil {
-		if intVal, err := strconv.Atoi(val); err == nil {
+	if val, err := queries.GetSetting(context.Background(), KeyReloadTime); err == nil {
+		if intVal, err := strconv.Atoi(val.Value); err == nil {
 			config.ReloadTime = intVal
 		}
 	}
 
 	// Load auto_reload
-	if val, err := settings.GetSetting(KeyAutoReload); err == nil {
-		config.AutoReload = (val == "true" || val == "yes")
+	if val, err := queries.GetSetting(context.Background(), KeyAutoReload); err == nil {
+		config.AutoReload = (val.Value == "true" || val.Value == "yes")
 	}
 
 	// Load suppress_first_reload
-	if val, err := settings.GetSetting(KeySuppressFirstReload); err == nil {
-		config.SuppressFirstReload = (val == "true" || val == "yes")
+	if val, err := queries.GetSetting(context.Background(), KeySuppressFirstReload); err == nil {
+		config.SuppressFirstReload = (val.Value == "true" || val.Value == "yes")
 	}
 
 	// Load reload_on_startup
-	if val, err := settings.GetSetting(KeyReloadOnStartup); err == nil {
-		config.ReloadOnStartup = (val == "true" || val == "yes")
+	if val, err := queries.GetSetting(context.Background(), KeyReloadOnStartup); err == nil {
+		config.ReloadOnStartup = (val.Value == "true" || val.Value == "yes")
 	}
 
 	// Load theme name
-	if val, err := settings.GetSetting(KeyThemeName); err == nil {
-		config.ThemeName = val
+	if val, err := queries.GetSetting(context.Background(), KeyThemeName); err == nil {
+		config.ThemeName = val.Value
 	}
 
 	// Load highlight style
-	if val, err := settings.GetSetting(KeyHighlightStyle); err == nil {
-		config.HighlightStyle = val
+	if val, err := queries.GetSetting(context.Background(), KeyHighlightStyle); err == nil {
+		config.HighlightStyle = val.Value
 	}
 
 	// Load spinner type
-	if val, err := settings.GetSetting(KeySpinnerType); err == nil {
-		config.SpinnerType = val
+	if val, err := queries.GetSetting(context.Background(), KeySpinnerType); err == nil {
+		config.SpinnerType = val.Value
 	}
 
 	// Load show read feeds
-	if val, err := settings.GetSetting(KeyShowReadFeeds); err == nil {
-		config.ShowReadFeeds = (val == "true" || val == "yes")
+	if val, err := queries.GetSetting(context.Background(), KeyShowReadFeeds); err == nil {
+		config.ShowReadFeeds = (val.Value == "true" || val.Value == "yes")
 	}
 
 	// Load unread on top
-	if val, err := settings.GetSetting(KeyUnreadOnTop); err == nil {
-		config.UnreadOnTop = (val == "true" || val == "yes")
+	if val, err := queries.GetSetting(context.Background(), KeyUnreadOnTop); err == nil {
+		config.UnreadOnTop = (val.Value == "true" || val.Value == "yes")
 	}
 
 	// Load check for updates
-	if val, err := settings.GetSetting(KeyCheckForUpdates); err == nil {
-		config.CheckForUpdates = (val == "true" || val == "yes")
+	if val, err := queries.GetSetting(context.Background(), KeyCheckForUpdates); err == nil {
+		config.CheckForUpdates = (val.Value == "true" || val.Value == "yes")
 	}
 
 	// Validate config values
@@ -126,14 +129,20 @@ func LoadConfig(settings SettingsManager) (Config, error) {
 	return config, nil
 }
 
-func SaveConfig(settings SettingsManager, config Config) error {
+func SaveConfig(queries *database.Queries, config Config) error {
 	// Save reload_concurrency
-	if err := settings.SetSetting(KeyReloadConcurrency, strconv.Itoa(config.ReloadConcurrency)); err != nil {
+	if err := queries.SetSetting(context.Background(), database.SetSettingParams{
+		Key:   KeyReloadConcurrency,
+		Value: strconv.Itoa(config.ReloadConcurrency),
+	}); err != nil {
 		return err
 	}
 
 	// Save reload_time
-	if err := settings.SetSetting(KeyReloadTime, strconv.Itoa(config.ReloadTime)); err != nil {
+	if err := queries.SetSetting(context.Background(), database.SetSettingParams{
+		Key:   KeyReloadTime,
+		Value: strconv.Itoa(config.ReloadTime),
+	}); err != nil {
 		return err
 	}
 
@@ -142,7 +151,10 @@ func SaveConfig(settings SettingsManager, config Config) error {
 	if config.AutoReload {
 		autoReloadStr = "true"
 	}
-	if err := settings.SetSetting(KeyAutoReload, autoReloadStr); err != nil {
+	if err := queries.SetSetting(context.Background(), database.SetSettingParams{
+		Key:   KeyAutoReload,
+		Value: autoReloadStr,
+	}); err != nil {
 		return err
 	}
 
@@ -151,7 +163,10 @@ func SaveConfig(settings SettingsManager, config Config) error {
 	if config.SuppressFirstReload {
 		suppressFirstReloadStr = "true"
 	}
-	if err := settings.SetSetting(KeySuppressFirstReload, suppressFirstReloadStr); err != nil {
+	if err := queries.SetSetting(context.Background(), database.SetSettingParams{
+		Key:   KeySuppressFirstReload,
+		Value: suppressFirstReloadStr,
+	}); err != nil {
 		return err
 	}
 
@@ -160,22 +175,34 @@ func SaveConfig(settings SettingsManager, config Config) error {
 	if config.ReloadOnStartup {
 		reloadOnStartupStr = "true"
 	}
-	if err := settings.SetSetting(KeyReloadOnStartup, reloadOnStartupStr); err != nil {
+	if err := queries.SetSetting(context.Background(), database.SetSettingParams{
+		Key:   KeyReloadOnStartup,
+		Value: reloadOnStartupStr,
+	}); err != nil {
 		return err
 	}
 
 	// Save theme name
-	if err := settings.SetSetting(KeyThemeName, config.ThemeName); err != nil {
+	if err := queries.SetSetting(context.Background(), database.SetSettingParams{
+		Key:   KeyThemeName,
+		Value: config.ThemeName,
+	}); err != nil {
 		return err
 	}
 
 	// Save highlight style
-	if err := settings.SetSetting(KeyHighlightStyle, config.HighlightStyle); err != nil {
+	if err := queries.SetSetting(context.Background(), database.SetSettingParams{
+		Key:   KeyHighlightStyle,
+		Value: config.HighlightStyle,
+	}); err != nil {
 		return err
 	}
 
 	// Save spinner type
-	if err := settings.SetSetting(KeySpinnerType, config.SpinnerType); err != nil {
+	if err := queries.SetSetting(context.Background(), database.SetSettingParams{
+		Key:   KeySpinnerType,
+		Value: config.SpinnerType,
+	}); err != nil {
 		return err
 	}
 
@@ -184,7 +211,10 @@ func SaveConfig(settings SettingsManager, config Config) error {
 	if config.ShowReadFeeds {
 		showReadFeedsStr = "true"
 	}
-	if err := settings.SetSetting(KeyShowReadFeeds, showReadFeedsStr); err != nil {
+	if err := queries.SetSetting(context.Background(), database.SetSettingParams{
+		Key:   KeyShowReadFeeds,
+		Value: showReadFeedsStr,
+	}); err != nil {
 		return err
 	}
 
@@ -193,7 +223,10 @@ func SaveConfig(settings SettingsManager, config Config) error {
 	if config.UnreadOnTop {
 		unreadOnTopStr = "true"
 	}
-	if err := settings.SetSetting(KeyUnreadOnTop, unreadOnTopStr); err != nil {
+	if err := queries.SetSetting(context.Background(), database.SetSettingParams{
+		Key:   KeyUnreadOnTop,
+		Value: unreadOnTopStr,
+	}); err != nil {
 		return err
 	}
 
@@ -202,7 +235,10 @@ func SaveConfig(settings SettingsManager, config Config) error {
 	if config.CheckForUpdates {
 		checkForUpdatesStr = "true"
 	}
-	if err := settings.SetSetting(KeyCheckForUpdates, checkForUpdatesStr); err != nil {
+	if err := queries.SetSetting(context.Background(), database.SetSettingParams{
+		Key:   KeyCheckForUpdates,
+		Value: checkForUpdatesStr,
+	}); err != nil {
 		return err
 	}
 

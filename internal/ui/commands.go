@@ -17,7 +17,7 @@ import (
 	"github.com/jarv/newsgoat/internal/updater"
 )
 
-func loadFeedList(feedManager feeds.FeedManager) tea.Cmd {
+func loadFeedList(feedManager *feeds.Manager) tea.Cmd {
 	return func() tea.Msg {
 		feeds, err := feedManager.GetFeedStats()
 		if err != nil {
@@ -28,7 +28,7 @@ func loadFeedList(feedManager feeds.FeedManager) tea.Cmd {
 	}
 }
 
-func loadItemList(feedManager feeds.FeedManager, feedID int64) tea.Cmd {
+func loadItemList(feedManager *feeds.Manager, feedID int64) tea.Cmd {
 	return func() tea.Msg {
 		items, err := feedManager.GetItemsWithReadStatus(feedID)
 		if err != nil {
@@ -48,7 +48,7 @@ func loadItemList(feedManager feeds.FeedManager, feedID int64) tea.Cmd {
 	}
 }
 
-func loadLogList(feedManager feeds.FeedManager) tea.Cmd {
+func loadLogList(feedManager *feeds.Manager) tea.Cmd {
 	return func() tea.Msg {
 		logs, err := feedManager.GetLogMessages(1000) // Get last 1000 log messages
 		if err != nil {
@@ -102,7 +102,7 @@ func removeTask(taskManager tasks.Manager, taskID string) tea.Cmd {
 	}
 }
 
-func clearAllLogMessages(feedManager feeds.FeedManager) tea.Cmd {
+func clearAllLogMessages(feedManager *feeds.Manager) tea.Cmd {
 	return func() tea.Msg {
 		err := feedManager.DeleteAllLogMessages()
 		if err != nil {
@@ -114,7 +114,7 @@ func clearAllLogMessages(feedManager feeds.FeedManager) tea.Cmd {
 	}
 }
 
-func refreshFeedAndReload(feedManager feeds.FeedManager, feedID int64) tea.Cmd {
+func refreshFeedAndReload(feedManager *feeds.Manager, feedID int64) tea.Cmd {
 	return func() tea.Msg {
 		err := feedManager.RefreshFeed(feedID)
 		if err != nil {
@@ -125,13 +125,13 @@ func refreshFeedAndReload(feedManager feeds.FeedManager, feedID int64) tea.Cmd {
 	}
 }
 
-func refreshAllFeedsConcurrent(feedManager feeds.FeedManager) tea.Cmd {
+func refreshAllFeedsConcurrent(feedManager *feeds.Manager) tea.Cmd {
 	return func() tea.Msg {
 		return RefreshAllStartMsg{}
 	}
 }
 
-func markItemRead(feedManager feeds.FeedManager, itemID int64) tea.Cmd {
+func markItemRead(feedManager *feeds.Manager, itemID int64) tea.Cmd {
 	return func() tea.Msg {
 		err := feedManager.MarkItemRead(itemID)
 		if err != nil {
@@ -141,7 +141,7 @@ func markItemRead(feedManager feeds.FeedManager, itemID int64) tea.Cmd {
 	}
 }
 
-func markAllItemsReadInFeed(feedManager feeds.FeedManager, feedID int64) tea.Cmd {
+func markAllItemsReadInFeed(feedManager *feeds.Manager, feedID int64) tea.Cmd {
 	return func() tea.Msg {
 		err := feedManager.MarkAllItemsReadInFeed(feedID)
 		if err != nil {
@@ -152,7 +152,7 @@ func markAllItemsReadInFeed(feedManager feeds.FeedManager, feedID int64) tea.Cmd
 	}
 }
 
-func markAllItemsReadInFolder(feedManager feeds.FeedManager, folderName string) tea.Cmd {
+func markAllItemsReadInFolder(feedManager *feeds.Manager, folderName string) tea.Cmd {
 	return func() tea.Msg {
 		// Get all feeds in this folder
 		allFeeds, err := feedManager.GetAllFeeds()
@@ -186,7 +186,7 @@ func markAllItemsReadInFolder(feedManager feeds.FeedManager, folderName string) 
 	}
 }
 
-func toggleItemReadStatus(feedManager feeds.FeedManager, itemID int64, currentlyRead bool) tea.Cmd {
+func toggleItemReadStatus(feedManager *feeds.Manager, itemID int64, currentlyRead bool) tea.Cmd {
 	return func() tea.Msg {
 		var err error
 		if currentlyRead {
@@ -271,7 +271,7 @@ func quitApp(taskManager tasks.Manager) tea.Cmd {
 	}
 }
 
-func loadFeedInfo(feedManager feeds.FeedManager, feedID int64) tea.Cmd {
+func loadFeedInfo(feedManager *feeds.Manager, feedID int64) tea.Cmd {
 	return func() tea.Msg {
 		feed, err := feedManager.GetFeed(feedID)
 		if err != nil {
@@ -282,7 +282,7 @@ func loadFeedInfo(feedManager feeds.FeedManager, feedID int64) tea.Cmd {
 	}
 }
 
-func openURLsFileInEditor(feedManager feeds.FeedManager) tea.Cmd {
+func openURLsFileInEditor(feedManager *feeds.Manager) tea.Cmd {
 	editor := config.GetEditor()
 	if editor == "" {
 		return func() tea.Msg {
@@ -338,7 +338,7 @@ func openURLsFileInEditor(feedManager feeds.FeedManager) tea.Cmd {
 	}
 }
 
-func addURLAndDiscover(feedManager feeds.FeedManager, input string) tea.Cmd {
+func addURLAndDiscover(feedManager *feeds.Manager, input string) tea.Cmd {
 	return func() tea.Msg {
 		// Parse input: URL followed by optional folders
 		// Format: <url> folder1,folder2 or <url> "folder with spaces",folder3
@@ -403,7 +403,7 @@ func addURLAndDiscover(feedManager feeds.FeedManager, input string) tea.Cmd {
 	}
 }
 
-func syncFeedsWithURLs(feedManager feeds.FeedManager, urlEntries []config.URLEntry) tea.Cmd {
+func syncFeedsWithURLs(feedManager *feeds.Manager, urlEntries []config.URLEntry) tea.Cmd {
 	return func() tea.Msg {
 		// Get all feeds from database
 		allFeeds, err := feedManager.GetAllFeeds()
@@ -483,7 +483,7 @@ func syncFeedsWithURLs(feedManager feeds.FeedManager, urlEntries []config.URLEnt
 	}
 }
 
-func syncFeedsFromTempFile(feedManager feeds.FeedManager, tempFilePath string) tea.Cmd {
+func syncFeedsFromTempFile(feedManager *feeds.Manager, tempFilePath string) tea.Cmd {
 	return func() tea.Msg {
 		// Read URLs from temp file
 		urlEntries, err := config.ReadURLsFileFromPath(tempFilePath)
@@ -503,7 +503,7 @@ func syncFeedsFromTempFile(feedManager feeds.FeedManager, tempFilePath string) t
 	}
 }
 
-func performSearch(feedManager feeds.FeedManager, viewState ViewState, feedID int64, searchType SearchType, query string) tea.Cmd {
+func performSearch(feedManager *feeds.Manager, viewState ViewState, feedID int64, searchType SearchType, query string) tea.Cmd {
 	return func() tea.Msg {
 		// If query is empty, return empty results (will restore unfiltered list)
 		if query == "" {
