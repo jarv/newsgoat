@@ -1,3 +1,10 @@
+## [3.0.6](https://github.com/jarv/newsgoat/compare/v3.0.5...v3.0.6) (2026-02-26)
+
+
+### Bug Fixes
+
+* **deps:** update module golang.org/x/net to v0.51.0 ([#105](https://github.com/jarv/newsgoat/issues/105)) ([c674219](https://github.com/jarv/newsgoat/commit/c674219e2d3c3b447c06fbfd73aeea86402d3935))
+
 ## [3.0.5](https://github.com/jarv/newsgoat/compare/v3.0.4...v3.0.5) (2026-02-09)
 
 
