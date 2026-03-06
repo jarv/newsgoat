@@ -1,6 +1,6 @@
 [tools]
 golang = "1.26.1"
-golangci-lint = "2.10.1"
+golangci-lint = "2.11.1"
 shellcheck = "0.11.0"
 nodejs = "24.14.0"
 shfmt = "3.12.0"
