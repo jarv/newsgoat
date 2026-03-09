@@ -9,7 +9,7 @@ require (
 	github.com/charmbracelet/lipgloss v1.1.1-0.20260209063657-1e3ee3483a90
 	github.com/google/uuid v1.6.0
 	github.com/mmcdole/gofeed v1.3.0
-	github.com/ncruces/go-sqlite3 v0.30.5
+	github.com/ncruces/go-sqlite3 v0.31.0
 	golang.org/x/net v0.51.0
 )
 
