@@ -1,3 +1,15 @@
+# [3.2.0](https://github.com/jarv/newsgoat/compare/v3.1.0...v3.2.0) (2026-04-27)
+
+
+### Features
+
+* add Homebrew tap support for macOS installation ([#136](https://github.com/jarv/newsgoat/issues/136)) ([2095949](https://github.com/jarv/newsgoat/commit/2095949ce6addb124dc61731cb0be97786bc5400)), closes [#88](https://github.com/jarv/newsgoat/issues/88)
+
+
+### Reverts
+
+* remove version check on launch feature (a70a2e9) ([#135](https://github.com/jarv/newsgoat/issues/135)) ([363ce31](https://github.com/jarv/newsgoat/commit/363ce31811e817feff4af3061c0f633010fbc6ca))
+
 # [3.1.0](https://github.com/jarv/newsgoat/compare/v3.0.11...v3.1.0) (2026-04-27)
 
 
