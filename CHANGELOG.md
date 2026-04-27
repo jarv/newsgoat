@@ -1,3 +1,10 @@
+# [3.5.0](https://github.com/jarv/newsgoat/compare/v3.4.2...v3.5.0) (2026-04-27)
+
+
+### Features
+
+* add OPML import command ([#138](https://github.com/jarv/newsgoat/issues/138)) ([dbbc9fd](https://github.com/jarv/newsgoat/commit/dbbc9fdbe299c252a839426d5fd57a592befe3bd))
+
 ## [3.4.2](https://github.com/jarv/newsgoat/compare/v3.4.1...v3.4.2) (2026-04-27)
 
 
