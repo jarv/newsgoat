@@ -2038,16 +2038,23 @@ func (m Model) getUnreadStyle() lipgloss.Style {
 	return lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("2"))
 }
 
-func (m Model) renderOrangeCount(unread, total int64) string {
+func (m Model) renderFilteredLine(prefix string, unread, total int64, suffix string, hasUnread bool) string {
 	orangeStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("208"))
 	unreadStr := orangeStyle.Render(fmt.Sprintf("%d", unread))
-	countStr := fmt.Sprintf("(%s/%d)", unreadStr, total)
-	plainLen := len(fmt.Sprintf("(%d/%d)", unread, total))
-	pad := 9 - plainLen
+
+	plainCountStr := fmt.Sprintf("(%d/%d)", unread, total)
+	pad := 9 - len(plainCountStr)
 	if pad < 0 {
 		pad = 0
 	}
-	return strings.Repeat(" ", pad) + countStr
+
+	if hasUnread {
+		style := m.getUnreadStyle()
+		return style.Render(prefix+strings.Repeat(" ", pad)+"(") +
+			unreadStr +
+			style.Render(fmt.Sprintf("/%d)", total)+suffix)
+	}
+	return prefix + strings.Repeat(" ", pad) + "(" + unreadStr + fmt.Sprintf("/%d)", total) + suffix
 }
 
 func (m Model) folderHasFilter(folderName string) bool {
@@ -2385,18 +2392,24 @@ func (m Model) renderFeedList() string {
 			if hasFilter {
 				displayUnread = m.filteredFolderUnread(item.FolderName)
 			}
-			if hasFilter && i != m.cursor {
-				paddedCount := m.renderOrangeCount(displayUnread, item.TotalItems)
+
+			if i == m.cursor {
+				countStr := fmt.Sprintf("(%d/%d)", displayUnread, item.TotalItems)
+				paddedCount := fmt.Sprintf("%9s", countStr)
 				line = folderIcon + "  " + paddedCount + " " + item.FolderName
+				line = m.applyHighlight(line, true)
+			} else if hasFilter {
+				line = m.renderFilteredLine(
+					folderIcon+"  ",
+					displayUnread, item.TotalItems,
+					" "+item.FolderName,
+					item.UnreadItems > 0,
+				)
+				line = m.applyHighlight(line, false)
 			} else {
 				countStr := fmt.Sprintf("(%d/%d)", displayUnread, item.TotalItems)
 				paddedCount := fmt.Sprintf("%9s", countStr)
 				line = folderIcon + "  " + paddedCount + " " + item.FolderName
-			}
-
-			if i == m.cursor {
-				line = m.applyHighlight(line, true)
-			} else {
 				if item.UnreadItems > 0 {
 					line = m.getUnreadStyle().Render(line)
 				}
@@ -2455,19 +2468,25 @@ func (m Model) renderFeedList() string {
 				prefix = ""
 			}
 
-			var paddedCount string
-			if hasFeedFilter && i != m.cursor {
-				paddedCount = m.renderOrangeCount(displayUnread, feed.TotalItems)
-			} else {
-				countStr := fmt.Sprintf("(%d/%d)", displayUnread, feed.TotalItems)
-				paddedCount = fmt.Sprintf("%9s", countStr)
-			}
-
-			line = prefix + statusEmoji + spinner + paddedCount + " " + displayTitle
+			linePrefix := prefix + statusEmoji + spinner
 
 			if i == m.cursor {
+				countStr := fmt.Sprintf("(%d/%d)", displayUnread, feed.TotalItems)
+				paddedCount := fmt.Sprintf("%9s", countStr)
+				line = linePrefix + paddedCount + " " + displayTitle
 				line = m.applyHighlight(line, true)
+			} else if hasFeedFilter {
+				line = m.renderFilteredLine(
+					linePrefix,
+					displayUnread, feed.TotalItems,
+					" "+displayTitle,
+					feed.UnreadItems > 0,
+				)
+				line = m.applyHighlight(line, false)
 			} else {
+				countStr := fmt.Sprintf("(%d/%d)", displayUnread, feed.TotalItems)
+				paddedCount := fmt.Sprintf("%9s", countStr)
+				line = linePrefix + paddedCount + " " + displayTitle
 				if feed.UnreadItems > 0 {
 					line = m.getUnreadStyle().Render(line)
 				}
