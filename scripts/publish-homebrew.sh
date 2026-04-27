@@ -23,6 +23,8 @@ git clone "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/jarv/homebrew
 cp newsgoat.rb "$TMPDIR/newsgoat.rb"
 
 cd "$TMPDIR"
+git config user.name "github-actions[bot]"
+git config user.email "github-actions[bot]@users.noreply.github.com"
 git add newsgoat.rb
 git commit -m "newsgoat ${VERSION}"
 git push
