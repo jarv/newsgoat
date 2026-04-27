@@ -8,7 +8,7 @@ import (
 	"log/slog"
 	"os"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/jarv/newsgoat/internal/config"
 	"github.com/jarv/newsgoat/internal/database"
 	"github.com/jarv/newsgoat/internal/discovery"
@@ -178,7 +178,7 @@ func run(debug bool) error {
 	}
 
 	model := ui.NewModel(feedManager, taskManager, queries, cfg)
-	p := tea.NewProgram(model, tea.WithAltScreen())
+	p := tea.NewProgram(model)
 
 	if _, err := p.Run(); err != nil {
 		return fmt.Errorf("failed to run TUI: %w", err)
