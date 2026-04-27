@@ -1,3 +1,10 @@
+# [3.1.0](https://github.com/jarv/newsgoat/compare/v3.0.11...v3.1.0) (2026-04-27)
+
+
+### Features
+
+* upgrade charmbracelet bubbletea, lipgloss, glamour to v2 ([#133](https://github.com/jarv/newsgoat/issues/133)) ([592de6c](https://github.com/jarv/newsgoat/commit/592de6c83ab3446ff1861e9eee0c9589d8503e03))
+
 ## [3.0.11](https://github.com/jarv/newsgoat/compare/v3.0.10...v3.0.11) (2026-04-27)
 
 
