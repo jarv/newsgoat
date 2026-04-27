@@ -1,3 +1,10 @@
+## [3.4.1](https://github.com/jarv/newsgoat/compare/v3.4.0...v3.4.1) (2026-04-27)
+
+
+### Bug Fixes
+
+* only show ✦ on the item where the filter is directly set ([caabcf4](https://github.com/jarv/newsgoat/commit/caabcf4a91a25b2d723c5cc0b6ff0f8a5c242f00))
+
 # [3.4.0](https://github.com/jarv/newsgoat/compare/v3.3.2...v3.4.0) (2026-04-27)
 
 
