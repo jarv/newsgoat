@@ -14,6 +14,7 @@ import (
 	"github.com/jarv/newsgoat/internal/discovery"
 	"github.com/jarv/newsgoat/internal/feeds"
 	"github.com/jarv/newsgoat/internal/logging"
+	"github.com/jarv/newsgoat/internal/opml"
 	"github.com/jarv/newsgoat/internal/tasks"
 	"github.com/jarv/newsgoat/internal/ui"
 	"github.com/jarv/newsgoat/internal/version"
@@ -38,7 +39,8 @@ func main() {
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: newsgoat [options] [command]\n\n")
 		fmt.Fprintf(os.Stderr, "Commands:\n")
-		fmt.Fprintf(os.Stderr, "  add <url>    Add a feed URL to the database\n\n")
+		fmt.Fprintf(os.Stderr, "  add <url>          Add a feed URL to the database\n")
+		fmt.Fprintf(os.Stderr, "  import <file|url>  Import feeds from an OPML file\n\n")
 		fmt.Fprintf(os.Stderr, "Options:\n")
 		flag.PrintDefaults()
 		fmt.Fprintf(os.Stderr, "\nEnvironment Variables:\n")
@@ -77,6 +79,17 @@ func main() {
 				os.Exit(1)
 			}
 			if err := addURL(args[1]); err != nil {
+				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+				os.Exit(1)
+			}
+			return
+		case "import":
+			if len(args) < 2 {
+				fmt.Fprintf(os.Stderr, "Error: 'import' command requires a file path or URL\n")
+				fmt.Fprintf(os.Stderr, "Usage: newsgoat import <file|url>\n")
+				os.Exit(1)
+			}
+			if err := importOPML(args[1]); err != nil {
 				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 				os.Exit(1)
 			}
@@ -127,6 +140,82 @@ func addURL(urlArg string) error {
 	}
 
 	fmt.Printf("Successfully added feed: %s\n", feedURL)
+	return nil
+}
+
+func importOPML(source string) error {
+	data, err := opml.ReadSource(source)
+	if err != nil {
+		return err
+	}
+
+	entries, err := opml.Parse(data)
+	if err != nil {
+		return err
+	}
+
+	db, queries, err := database.InitDBWithSchema(schemaSQL)
+	if err != nil {
+		return fmt.Errorf("failed to initialize database: %w", err)
+	}
+	defer func() {
+		_ = db.Close()
+	}()
+
+	if err := RunMigrations(db); err != nil {
+		return fmt.Errorf("failed to run migrations: %w", err)
+	}
+
+	feedManager := feeds.NewManager(db, queries)
+
+	allFeeds, err := feedManager.GetAllFeeds()
+	if err != nil {
+		return fmt.Errorf("failed to get existing feeds: %w", err)
+	}
+	existingURLs := make(map[string]database.Feed, len(allFeeds))
+	for _, f := range allFeeds {
+		existingURLs[f.Url] = f
+	}
+
+	var added, skipped, unhidden int
+	for _, entry := range entries {
+		if existing, ok := existingURLs[entry.URL]; ok {
+			if !existing.Visible {
+				if err := feedManager.ShowFeedByURL(entry.URL); err != nil {
+					fmt.Fprintf(os.Stderr, "  Warning: failed to unhide %s: %v\n", entry.URL, err)
+				} else {
+					unhidden++
+				}
+			} else {
+				skipped++
+			}
+			continue
+		}
+		if err := feedManager.AddFeedWithoutFetching(entry.URL); err != nil {
+			fmt.Fprintf(os.Stderr, "  Warning: failed to add %s: %v\n", entry.URL, err)
+			continue
+		}
+		if len(entry.Folders) > 0 {
+			feed, err := feedManager.GetFeedByURL(entry.URL)
+			if err == nil {
+				for _, folder := range entry.Folders {
+					_ = feedManager.AddFeedFolder(feed.ID, folder)
+				}
+			}
+		}
+		added++
+	}
+
+	fmt.Printf("Importing from: %s\n", source)
+	fmt.Printf("  Found %d feeds in OPML file\n", len(entries))
+	if skipped > 0 {
+		fmt.Printf("  %d already exist (skipped)\n", skipped)
+	}
+	if unhidden > 0 {
+		fmt.Printf("  %d were hidden and are now visible\n", unhidden)
+	}
+	fmt.Printf("  %d new feeds added\n", added)
+
 	return nil
 }
 
