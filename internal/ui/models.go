@@ -2039,8 +2039,9 @@ func (m Model) getUnreadStyle() lipgloss.Style {
 }
 
 func (m Model) renderFilteredLine(prefix string, unread, total int64, suffix string, hasUnread bool) string {
-	orangeStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("208"))
-	unreadStr := orangeStyle.Render(fmt.Sprintf("%d", unread))
+	theme := themes.GetThemeByName(m.config.ThemeName)
+	filterCountStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(theme.TitleColor))
+	unreadStr := filterCountStyle.Render(fmt.Sprintf("%d", unread))
 
 	plainCountStr := fmt.Sprintf("(%d/%d)", unread, total)
 	pad := 9 - len(plainCountStr)
