@@ -1,0 +1,24 @@
+class Newsgoat < Formula
+  desc "Terminal RSS/Atom feed reader"
+  homepage "https://github.com/jarv/newsgoat"
+  version "VERSION"
+  license "MIT"
+
+  on_arm do
+    url "https://github.com/jarv/newsgoat/releases/download/vVERSION/newsgoat-VERSION-darwin-arm64.tar.gz"
+    sha256 "SHA256_ARM64"
+  end
+
+  on_intel do
+    url "https://github.com/jarv/newsgoat/releases/download/vVERSION/newsgoat-VERSION-darwin-amd64.tar.gz"
+    sha256 "SHA256_AMD64"
+  end
+
+  def install
+    bin.install "newsgoat"
+  end
+
+  test do
+    assert_match "v#{version}", shell_output("#{bin}/newsgoat -version").strip
+  end
+end

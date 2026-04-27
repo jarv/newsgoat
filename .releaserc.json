@@ -8,7 +8,7 @@
       "@semantic-release/exec",
       {
         "prepareCmd": "mise run build-release ${nextRelease.version}",
-        "publishCmd": "echo 'Version ${nextRelease.version} published'"
+        "publishCmd": "bash scripts/publish-homebrew.sh ${nextRelease.version}"
       }
     ],
     [
@@ -19,6 +19,8 @@
           {"path": "newsgoat-linux-arm64", "label": "newsgoat-linux-arm64"},
           {"path": "newsgoat-darwin-amd64", "label": "newsgoat-darwin-amd64"},
           {"path": "newsgoat-darwin-arm64", "label": "newsgoat-darwin-arm64"},
+          {"path": "newsgoat-*-darwin-amd64.tar.gz"},
+          {"path": "newsgoat-*-darwin-arm64.tar.gz"},
           {"path": "checksums.txt", "label": "checksums.txt"}
         ]
       }

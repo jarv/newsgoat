@@ -45,6 +45,14 @@ GOOS=linux GOARCH=arm64 go build -ldflags "$LDFLAGS" -o newsgoat-linux-arm64 .
 GOOS=darwin GOARCH=amd64 go build -ldflags "$LDFLAGS" -o newsgoat-darwin-amd64 .
 GOOS=darwin GOARCH=arm64 go build -ldflags "$LDFLAGS" -o newsgoat-darwin-arm64 .
 
+# Create tar.gz archives for Homebrew (binary renamed to "newsgoat" inside)
+for arch in amd64 arm64; do
+  tmpdir=$(mktemp -d)
+  cp "newsgoat-darwin-${arch}" "${tmpdir}/newsgoat"
+  tar czf "newsgoat-${VERSION}-darwin-${arch}.tar.gz" -C "${tmpdir}" newsgoat
+  rm -rf "${tmpdir}"
+done
+
 # Create checksums
 sha256sum newsgoat-* > checksums.txt
 """
