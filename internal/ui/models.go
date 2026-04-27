@@ -2058,6 +2058,16 @@ func (m Model) renderFilteredLine(prefix string, unread, total int64, suffix str
 	return prefix + strings.Repeat(" ", pad) + "(" + unreadStr + fmt.Sprintf("/%d)", total) + suffix
 }
 
+func (m Model) folderHasFilterConfigured(folderName string) bool {
+	if _, ok := m.filterMap[filters.FolderKey(folderName)]; ok {
+		return true
+	}
+	if _, ok := m.filterMap["global"]; ok {
+		return true
+	}
+	return false
+}
+
 func (m Model) folderHasFilter(folderName string) bool {
 	for _, item := range m.feedList {
 		if !item.IsFolder && item.IsUnderFolder && item.Feed != nil {
@@ -2396,19 +2406,25 @@ func (m Model) renderFeedList() string {
 				folderIcon = "📁" // Closed folder
 			}
 			hasFilter := m.folderHasFilter(item.FolderName)
+			filterConfigured := m.folderHasFilterConfigured(item.FolderName)
 			displayUnread := item.UnreadItems
 			if hasFilter {
 				displayUnread = m.filteredFolderUnread(item.FolderName)
 			}
 
+			gap := "  "
+			if filterConfigured {
+				gap = "✦ "
+			}
+
 			if i == m.cursor {
 				countStr := fmt.Sprintf("(%d/%d)", displayUnread, item.TotalItems)
 				paddedCount := fmt.Sprintf("%9s", countStr)
-				line = folderIcon + "  " + paddedCount + " " + item.FolderName
+				line = folderIcon + gap + paddedCount + " " + item.FolderName
 				line = m.applyHighlight(line, true)
 			} else if hasFilter {
 				line = m.renderFilteredLine(
-					folderIcon+"  ",
+					folderIcon+gap,
 					displayUnread, item.TotalItems,
 					" "+item.FolderName,
 					item.UnreadItems > 0,
@@ -2417,19 +2433,18 @@ func (m Model) renderFeedList() string {
 			} else {
 				countStr := fmt.Sprintf("(%d/%d)", displayUnread, item.TotalItems)
 				paddedCount := fmt.Sprintf("%9s", countStr)
-				line = folderIcon + "  " + paddedCount + " " + item.FolderName
+				line = folderIcon + gap + paddedCount + " " + item.FolderName
 				if item.UnreadItems > 0 {
 					line = m.getUnreadStyle().Render(line)
 				}
 				line = m.applyHighlight(line, false)
 			}
 		} else {
-			// Render feed
 			feed := *item.Feed
+			feedFolders, _ := m.feedManager.GetFeedFolders(feed.ID)
+			filterConfigured := filters.HasActiveFilter(m.filterMap, feed.ID, feedFolders)
 
-			// Status emoji: error emoji if error (but not when refreshing), 'N' if unread, space if read
 			var statusEmoji string
-			// Don't show error emoji when actively refreshing - let the spinner show instead
 			if feed.LastError.Valid && feed.LastError.String != "" && !m.refreshingFeeds[feed.ID] {
 				// Try to determine error type from error message
 				errorMsg := feed.LastError.String
@@ -2452,13 +2467,14 @@ func (m Model) renderFeedList() string {
 				statusEmoji = "  " // All read - two spaces to match emoji width
 			}
 
-			// Spinner - 2 character space reserved for spinner when refreshing
 			var spinner string
 			if m.refreshingFeeds[feed.ID] {
 				spinnerFrames := themes.GetSpinnerFrames(m.config.SpinnerType)
 				spinner = spinnerFrames[m.spinnerFrame%len(spinnerFrames)] + " "
+			} else if filterConfigured {
+				spinner = "✦ "
 			} else {
-				spinner = "  " // Two spaces when not spinning
+				spinner = "  "
 			}
 
 			_, hasFeedFilter := m.filteredUnreadCounts[feed.ID]
