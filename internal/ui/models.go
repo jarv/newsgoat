@@ -2381,21 +2381,23 @@ func (m Model) renderFeedList() string {
 				folderIcon = "📁" // Closed folder
 			}
 			hasFilter := m.folderHasFilter(item.FolderName)
-			unread := item.UnreadItems
+			displayUnread := item.UnreadItems
 			if hasFilter {
-				unread = m.filteredFolderUnread(item.FolderName)
+				displayUnread = m.filteredFolderUnread(item.FolderName)
 			}
-			countStr := fmt.Sprintf("(%d/%d)", unread, item.TotalItems)
-			paddedCount := fmt.Sprintf("%9s", countStr)
 			if hasFilter && i != m.cursor {
-				paddedCount = m.renderOrangeCount(unread, item.TotalItems)
+				paddedCount := m.renderOrangeCount(displayUnread, item.TotalItems)
+				line = folderIcon + "  " + paddedCount + " " + item.FolderName
+			} else {
+				countStr := fmt.Sprintf("(%d/%d)", displayUnread, item.TotalItems)
+				paddedCount := fmt.Sprintf("%9s", countStr)
+				line = folderIcon + "  " + paddedCount + " " + item.FolderName
 			}
-			line = folderIcon + "  " + paddedCount + " " + item.FolderName
 
 			if i == m.cursor {
 				line = m.applyHighlight(line, true)
 			} else {
-				if unread > 0 {
+				if item.UnreadItems > 0 {
 					line = m.getUnreadStyle().Render(line)
 				}
 				line = m.applyHighlight(line, false)
@@ -2438,16 +2440,10 @@ func (m Model) renderFeedList() string {
 				spinner = "  " // Two spaces when not spinning
 			}
 
-			feedFiltered := len(m.filteredUnreadCounts) > 0
 			_, hasFeedFilter := m.filteredUnreadCounts[feed.ID]
-			unread := feed.UnreadItems
+			displayUnread := feed.UnreadItems
 			if hasFeedFilter {
-				unread = m.filteredUnreadCounts[feed.ID]
-			}
-			countStr := fmt.Sprintf("(%d/%d)", unread, feed.TotalItems)
-			paddedCount := fmt.Sprintf("%9s", countStr)
-			if feedFiltered && hasFeedFilter && i != m.cursor {
-				paddedCount = m.renderOrangeCount(unread, feed.TotalItems)
+				displayUnread = m.filteredUnreadCounts[feed.ID]
 			}
 
 			displayTitle := getDisplayTitle(feed)
@@ -2459,12 +2455,20 @@ func (m Model) renderFeedList() string {
 				prefix = ""
 			}
 
+			var paddedCount string
+			if hasFeedFilter && i != m.cursor {
+				paddedCount = m.renderOrangeCount(displayUnread, feed.TotalItems)
+			} else {
+				countStr := fmt.Sprintf("(%d/%d)", displayUnread, feed.TotalItems)
+				paddedCount = fmt.Sprintf("%9s", countStr)
+			}
+
 			line = prefix + statusEmoji + spinner + paddedCount + " " + displayTitle
 
 			if i == m.cursor {
 				line = m.applyHighlight(line, true)
 			} else {
-				if unread > 0 {
+				if feed.UnreadItems > 0 {
 					line = m.getUnreadStyle().Render(line)
 				}
 				line = m.applyHighlight(line, false)
