@@ -1,3 +1,10 @@
+## [3.5.1](https://github.com/jarv/newsgoat/compare/v3.5.0...v3.5.1) (2026-04-27)
+
+
+### Bug Fixes
+
+* apply filter to unread counts in feed list view ([23017e0](https://github.com/jarv/newsgoat/commit/23017e00a4befbf78cf330a3dad474d2475a8c58))
+
 # [3.5.0](https://github.com/jarv/newsgoat/compare/v3.4.2...v3.5.0) (2026-04-27)
 
 
