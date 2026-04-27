@@ -2385,6 +2385,11 @@ func (m Model) renderFeedList() string {
 			feed := *item.Feed
 			_, filterConfigured := m.filterMap[filters.FeedKey(feed.ID)]
 
+			displayUnread := feed.UnreadItems
+			if count, ok := m.filteredUnreadCounts[feed.ID]; ok {
+				displayUnread = count
+			}
+
 			var statusEmoji string
 			if feed.LastError.Valid && feed.LastError.String != "" && !m.refreshingFeeds[feed.ID] {
 				errorMsg := feed.LastError.String
@@ -2401,7 +2406,7 @@ func (m Model) renderFeedList() string {
 				} else {
 					statusEmoji = "❌"
 				}
-			} else if feed.UnreadItems > 0 {
+			} else if displayUnread > 0 {
 				statusEmoji = "N "
 			} else {
 				statusEmoji = "  "
@@ -2415,11 +2420,6 @@ func (m Model) renderFeedList() string {
 				spinner = "✦ "
 			} else {
 				spinner = "  "
-			}
-
-			displayUnread := feed.UnreadItems
-			if count, ok := m.filteredUnreadCounts[feed.ID]; ok {
-				displayUnread = count
 			}
 			countStr := fmt.Sprintf("(%d/%d)", displayUnread, feed.TotalItems)
 			paddedCount := fmt.Sprintf("%9s", countStr)
