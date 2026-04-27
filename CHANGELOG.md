@@ -1,3 +1,10 @@
+## [3.4.2](https://github.com/jarv/newsgoat/compare/v3.4.1...v3.4.2) (2026-04-27)
+
+
+### Bug Fixes
+
+* remove filter count coloring, keep only ✦ indicator for configured filters ([a3a2b50](https://github.com/jarv/newsgoat/commit/a3a2b50315df10085764b61bff9e144c9403c8d2))
+
 ## [3.4.1](https://github.com/jarv/newsgoat/compare/v3.4.0...v3.4.1) (2026-04-27)
 
 
