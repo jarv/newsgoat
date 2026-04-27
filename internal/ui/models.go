@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/glamour"
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/glamour/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/jarv/newsgoat/internal/config"
 	"github.com/jarv/newsgoat/internal/database"
 	"github.com/jarv/newsgoat/internal/discovery"
@@ -434,7 +434,6 @@ func (m Model) Init() tea.Cmd {
 	var cmds []tea.Cmd
 	cmds = append(cmds,
 		loadFeedList(m.feedManager),
-		tea.WindowSize(),
 		listenForTaskEvents(m.taskManager),
 	)
 
@@ -460,25 +459,25 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 		return m, nil
 
-	case tea.KeyMsg:
-		// Handle paste events for URL input and search
-		if msg.Paste {
-			if m.addingURL {
-				m.urlInput += string(msg.Runes)
-				return m, nil
-			} else if m.searchMode {
-				m.searchQuery += string(msg.Runes)
-				switch m.state {
-				case FeedListView:
-					m.cursor = 0
-					m.savedFeedCursor = 0
-				case ItemListView:
-					m.cursor = 0
-					m.savedItemCursor = 0
-				}
-				return m, performSearch(m.feedManager, m.state, m.selectedFeed, m.searchType, m.searchQuery)
+	case tea.PasteMsg:
+		if m.addingURL {
+			m.urlInput += msg.Content
+			return m, nil
+		} else if m.searchMode {
+			m.searchQuery += msg.Content
+			switch m.state {
+			case FeedListView:
+				m.cursor = 0
+				m.savedFeedCursor = 0
+			case ItemListView:
+				m.cursor = 0
+				m.savedItemCursor = 0
 			}
+			return m, performSearch(m.feedManager, m.state, m.selectedFeed, m.searchType, m.searchQuery)
 		}
+		return m, nil
+
+	case tea.KeyPressMsg:
 		return m.handleKeyPress(msg)
 
 	case FeedListLoadedMsg:
@@ -979,7 +978,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch m.state {
 	case FeedListView:
 		return m.handleFeedListKeys(msg)
@@ -1005,7 +1004,7 @@ func (m Model) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) handleFeedListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleFeedListKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	// Clear status message and quit state on any keypress (except 'q' and 'ctrl+c' themselves)
 	key := msg.String()
 	if key != "q" && key != "ctrl+c" {
@@ -1511,7 +1510,7 @@ func (m Model) handleFeedListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) handleItemListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleItemListKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	// Handle search mode separately
 	if m.searchMode {
 		switch msg.String() {
@@ -1769,7 +1768,7 @@ func (m Model) handleItemListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) handleArticleKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleArticleKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "?":
 		m.previousState = m.state
@@ -1915,35 +1914,40 @@ func (m Model) handleArticleKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) View() string {
+func (m Model) View() tea.View {
+	var content string
 	if m.err != nil {
-		return fmt.Sprintf("Error: %v\n\nPress q to quit", m.err)
+		content = fmt.Sprintf("Error: %v\n\nPress q to quit", m.err)
+	} else {
+		switch m.state {
+		case FeedListView:
+			content = m.renderFeedList()
+		case ItemListView:
+			content = m.renderItemList()
+		case ArticleView:
+			content = m.renderArticle()
+		case FeedInfoView:
+			content = m.renderFeedInfo()
+		case LogView:
+			content = m.renderLogList()
+		case LogDetailView:
+			content = m.renderLogDetail()
+		case TasksView:
+			content = m.renderTasksView()
+		case HelpView:
+			content = m.renderHelpView()
+		case SettingsView:
+			content = m.renderSettingsView()
+		case URLsView:
+			content = m.renderURLsView()
+		default:
+			content = "Loading..."
+		}
 	}
 
-	switch m.state {
-	case FeedListView:
-		return m.renderFeedList()
-	case ItemListView:
-		return m.renderItemList()
-	case ArticleView:
-		return m.renderArticle()
-	case FeedInfoView:
-		return m.renderFeedInfo()
-	case LogView:
-		return m.renderLogList()
-	case LogDetailView:
-		return m.renderLogDetail()
-	case TasksView:
-		return m.renderTasksView()
-	case HelpView:
-		return m.renderHelpView()
-	case SettingsView:
-		return m.renderSettingsView()
-	case URLsView:
-		return m.renderURLsView()
-	}
-
-	return "Loading..."
+	v := tea.NewView(content)
+	v.AltScreen = true
+	return v
 }
 
 func (m Model) getTitleStyle() lipgloss.Style {
@@ -2784,7 +2788,7 @@ func (m Model) renderArticle() string {
 	return b.String()
 }
 
-func (m Model) handleLogListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleLogListKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "?":
 		m.previousState = m.state
@@ -2844,7 +2848,7 @@ func (m Model) handleLogListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) handleLogDetailKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleLogDetailKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "?":
 		m.previousState = m.state
@@ -2860,7 +2864,7 @@ func (m Model) handleLogDetailKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) handleTasksViewKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleTasksViewKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "?":
 		m.previousState = m.state
@@ -3164,7 +3168,7 @@ func (m *Model) startNextBatchOfFeeds() tea.Cmd {
 	return nil
 }
 
-func (m Model) handleHelpViewKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleHelpViewKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "q", "esc", "?", "ctrl+c":
 		// Return to previous view and reset scroll
@@ -3474,7 +3478,7 @@ func (m Model) renderTasksView() string {
 	return b.String()
 }
 
-func (m Model) handleSettingsViewKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleSettingsViewKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	// If we're selecting a theme, handle theme selector
 	if m.selectingTheme {
 		switch msg.String() {
@@ -3750,21 +3754,18 @@ func (m Model) handleSettingsViewKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	// If we're editing reload concurrency, handle input
 	if m.editingSettings {
-		switch msg.Type {
+		switch msg.Code {
 		case tea.KeyEsc:
-			// Cancel editing
 			m.editingSettings = false
 			m.settingInput = ""
 			return m, nil
 
 		case tea.KeyEnter:
-			// Save the setting
 			m.editingSettings = false
 			oldReloadTime := m.config.ReloadTime
 
 			switch m.cursor {
 			case 0:
-				// Reload concurrency
 				if val, parseErr := strconv.Atoi(m.settingInput); parseErr == nil {
 					if val >= 1 && val <= 10 {
 						m.config.ReloadConcurrency = val
@@ -3774,14 +3775,12 @@ func (m Model) handleSettingsViewKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 					}
 				}
 			case 1:
-				// Reload time
 				if val, parseErr := strconv.Atoi(m.settingInput); parseErr == nil {
 					if val >= 0 {
 						m.config.ReloadTime = val
 						if err := config.SaveConfig(m.queries, m.config); err != nil {
 							m.err = err
 						}
-						// If reload time changed, restart the timer
 						if oldReloadTime != m.config.ReloadTime {
 							return m, restartReloadTimer()
 						}
@@ -3793,16 +3792,16 @@ func (m Model) handleSettingsViewKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 
 		case tea.KeyBackspace:
-			// Delete last character
 			if len(m.settingInput) > 0 {
 				m.settingInput = m.settingInput[:len(m.settingInput)-1]
 			}
 			return m, nil
 
-		case tea.KeyRunes:
-			// Add character to input
-			m.settingInput += string(msg.Runes)
-			return m, nil
+		default:
+			if msg.Text != "" {
+				m.settingInput += msg.Text
+				return m, nil
+			}
 		}
 
 		return m, nil
@@ -4253,7 +4252,7 @@ func (m Model) renderSettingsView() string {
 	return b.String()
 }
 
-func (m Model) handleFeedInfoKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleFeedInfoKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "?":
 		m.previousState = m.state
@@ -4269,7 +4268,7 @@ func (m Model) handleFeedInfoKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) handleURLsViewKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleURLsViewKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "q", "esc", "ctrl+c":
 		m.state = m.previousState
