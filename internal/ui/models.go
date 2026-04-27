@@ -2714,7 +2714,7 @@ func (m *Model) getArticleContentLines() []string {
 		contentBuilder.WriteString(m.getHelpStyle().Render("Links:"))
 		contentBuilder.WriteString("\n")
 		for i, link := range m.links {
-			contentBuilder.WriteString(fmt.Sprintf("[%d]: %s\n", i+1, link))
+			fmt.Fprintf(&contentBuilder, "[%d]: %s\n", i+1, link)
 		}
 	}
 
@@ -3049,14 +3049,14 @@ func (m Model) renderLogDetail() string {
 
 	// Timestamp
 	if m.currentLog.Timestamp.Valid {
-		b.WriteString(fmt.Sprintf("Time: %s\n", m.currentLog.Timestamp.Time.Format("2006-01-02 15:04:05")))
+		fmt.Fprintf(&b, "Time: %s\n", m.currentLog.Timestamp.Time.Format("2006-01-02 15:04:05"))
 	}
 
 	// Level
-	b.WriteString(fmt.Sprintf("Level: %s\n", m.currentLog.Level))
+	fmt.Fprintf(&b, "Level: %s\n", m.currentLog.Level)
 
 	// Message
-	b.WriteString(fmt.Sprintf("Message: %s\n\n", m.currentLog.Message))
+	fmt.Fprintf(&b, "Message: %s\n\n", m.currentLog.Message)
 
 	// Attributes (if any)
 	if m.currentLog.Attributes.Valid && m.currentLog.Attributes.String != "" {
@@ -3095,12 +3095,12 @@ func (m Model) renderLogDetail() string {
 
 				// Print first line with key
 				if len(wrappedLines) > 0 {
-					b.WriteString(fmt.Sprintf("  %s: %s\n", key, wrappedLines[0]))
+					fmt.Fprintf(&b, "  %s: %s\n", key, wrappedLines[0])
 					// Print remaining lines indented
 					for i := 1; i < len(wrappedLines); i++ {
 						// Indent to align with first line value
 						indent := strings.Repeat(" ", len(key)+4)
-						b.WriteString(fmt.Sprintf("%s%s\n", indent, wrappedLines[i]))
+						fmt.Fprintf(&b, "%s%s\n", indent, wrappedLines[i])
 					}
 				}
 			}
@@ -3212,70 +3212,70 @@ func (m Model) renderHelpView() string {
 	// Global keys section
 	content.WriteString("Global\n")
 	for _, binding := range GlobalKeys {
-		content.WriteString(fmt.Sprintf("  %-15s %s\n", binding.Key, binding.Description))
+		fmt.Fprintf(&content, "  %-15s %s\n", binding.Key, binding.Description)
 	}
 	content.WriteString("\n")
 
 	// Feed List View keys
 	content.WriteString("Feed List View\n")
-	content.WriteString(fmt.Sprintf("  %-15s %s\n", "r", "Refresh selected feed"))
-	content.WriteString(fmt.Sprintf("  %-15s %s\n", "R", "Refresh all feeds"))
-	content.WriteString(fmt.Sprintf("  %-15s %s\n", "A", "Mark all items in feed as read"))
-	content.WriteString(fmt.Sprintf("  %-15s %s\n", "i", "Show feed info"))
-	content.WriteString(fmt.Sprintf("  %-15s %s\n", "ctrl+u", "Upgrade to new version (when available)"))
-	content.WriteString(fmt.Sprintf("  %-15s %s\n", "/", "Global search (text of all feeds)"))
-	content.WriteString(fmt.Sprintf("  %-15s %s\n", "ctrl+f", "Title search only"))
-	content.WriteString(fmt.Sprintf("  %-15s %s\n", "u", "Add URL (with discovery)"))
-	content.WriteString(fmt.Sprintf("  %-15s %s\n", "U", "Edit URLs in $EDITOR"))
-	content.WriteString(fmt.Sprintf("  %-15s %s\n", "ctrl+r", "Reload URLs from file"))
-	content.WriteString(fmt.Sprintf("  %-15s %s\n", "l", "View logs"))
-	content.WriteString(fmt.Sprintf("  %-15s %s\n", "t", "View tasks"))
-	content.WriteString(fmt.Sprintf("  %-15s %s\n", "c", "View settings"))
+	fmt.Fprintf(&content, "  %-15s %s\n", "r", "Refresh selected feed")
+	fmt.Fprintf(&content, "  %-15s %s\n", "R", "Refresh all feeds")
+	fmt.Fprintf(&content, "  %-15s %s\n", "A", "Mark all items in feed as read")
+	fmt.Fprintf(&content, "  %-15s %s\n", "i", "Show feed info")
+	fmt.Fprintf(&content, "  %-15s %s\n", "ctrl+u", "Upgrade to new version (when available)")
+	fmt.Fprintf(&content, "  %-15s %s\n", "/", "Global search (text of all feeds)")
+	fmt.Fprintf(&content, "  %-15s %s\n", "ctrl+f", "Title search only")
+	fmt.Fprintf(&content, "  %-15s %s\n", "u", "Add URL (with discovery)")
+	fmt.Fprintf(&content, "  %-15s %s\n", "U", "Edit URLs in $EDITOR")
+	fmt.Fprintf(&content, "  %-15s %s\n", "ctrl+r", "Reload URLs from file")
+	fmt.Fprintf(&content, "  %-15s %s\n", "l", "View logs")
+	fmt.Fprintf(&content, "  %-15s %s\n", "t", "View tasks")
+	fmt.Fprintf(&content, "  %-15s %s\n", "c", "View settings")
 	content.WriteString("\n")
 
 	// Item List View keys
 	content.WriteString("Item List View\n")
-	content.WriteString(fmt.Sprintf("  %-15s %s\n", "r", "Refresh feed"))
-	content.WriteString(fmt.Sprintf("  %-15s %s\n", "R", "Refresh all feeds"))
-	content.WriteString(fmt.Sprintf("  %-15s %s\n", "A", "Mark all items as read"))
-	content.WriteString(fmt.Sprintf("  %-15s %s\n", "/", "Global search (text of all feeds)"))
-	content.WriteString(fmt.Sprintf("  %-15s %s\n", "ctrl+f", "Title search only"))
-	content.WriteString(fmt.Sprintf("  %-15s %s\n", "h, left", "Scroll title left"))
-	content.WriteString(fmt.Sprintf("  %-15s %s\n", "l, right", "Scroll title right"))
-	content.WriteString(fmt.Sprintf("  %-15s %s\n", "0", "Jump to start of title"))
-	content.WriteString(fmt.Sprintf("  %-15s %s\n", "$", "Jump to end of title"))
-	content.WriteString(fmt.Sprintf("  %-15s %s\n", "N", "Toggle read status of item"))
-	content.WriteString(fmt.Sprintf("  %-15s %s\n", "o", "Open item link in browser"))
-	content.WriteString(fmt.Sprintf("  %-15s %s\n", "c", "View settings"))
-	content.WriteString(fmt.Sprintf("  %-15s %s\n", "t", "View tasks"))
+	fmt.Fprintf(&content, "  %-15s %s\n", "r", "Refresh feed")
+	fmt.Fprintf(&content, "  %-15s %s\n", "R", "Refresh all feeds")
+	fmt.Fprintf(&content, "  %-15s %s\n", "A", "Mark all items as read")
+	fmt.Fprintf(&content, "  %-15s %s\n", "/", "Global search (text of all feeds)")
+	fmt.Fprintf(&content, "  %-15s %s\n", "ctrl+f", "Title search only")
+	fmt.Fprintf(&content, "  %-15s %s\n", "h, left", "Scroll title left")
+	fmt.Fprintf(&content, "  %-15s %s\n", "l, right", "Scroll title right")
+	fmt.Fprintf(&content, "  %-15s %s\n", "0", "Jump to start of title")
+	fmt.Fprintf(&content, "  %-15s %s\n", "$", "Jump to end of title")
+	fmt.Fprintf(&content, "  %-15s %s\n", "N", "Toggle read status of item")
+	fmt.Fprintf(&content, "  %-15s %s\n", "o", "Open item link in browser")
+	fmt.Fprintf(&content, "  %-15s %s\n", "c", "View settings")
+	fmt.Fprintf(&content, "  %-15s %s\n", "t", "View tasks")
 	content.WriteString("\n")
 
 	// Article View keys
 	content.WriteString("Article View\n")
-	content.WriteString(fmt.Sprintf("  %-15s %s\n", "1-9", "Open numbered link in browser"))
-	content.WriteString(fmt.Sprintf("  %-15s %s\n", "o", "Open article link in browser"))
-	content.WriteString(fmt.Sprintf("  %-15s %s\n", "n", "Next article"))
-	content.WriteString(fmt.Sprintf("  %-15s %s\n", "N", "Previous article"))
-	content.WriteString(fmt.Sprintf("  %-15s %s\n", "r", "Toggle raw HTML view"))
-	content.WriteString(fmt.Sprintf("  %-15s %s\n", "c", "View settings"))
-	content.WriteString(fmt.Sprintf("  %-15s %s\n", "t", "View tasks"))
+	fmt.Fprintf(&content, "  %-15s %s\n", "1-9", "Open numbered link in browser")
+	fmt.Fprintf(&content, "  %-15s %s\n", "o", "Open article link in browser")
+	fmt.Fprintf(&content, "  %-15s %s\n", "n", "Next article")
+	fmt.Fprintf(&content, "  %-15s %s\n", "N", "Previous article")
+	fmt.Fprintf(&content, "  %-15s %s\n", "r", "Toggle raw HTML view")
+	fmt.Fprintf(&content, "  %-15s %s\n", "c", "View settings")
+	fmt.Fprintf(&content, "  %-15s %s\n", "t", "View tasks")
 	content.WriteString("\n")
 
 	// Settings View keys
 	content.WriteString("Settings View\n")
-	content.WriteString(fmt.Sprintf("  %-15s %s\n", "?", "Toggle settings help"))
+	fmt.Fprintf(&content, "  %-15s %s\n", "?", "Toggle settings help")
 	content.WriteString("\n")
 
 	// Tasks View keys
 	content.WriteString("Tasks View\n")
-	content.WriteString(fmt.Sprintf("  %-15s %s\n", "d", "Remove selected task"))
-	content.WriteString(fmt.Sprintf("  %-15s %s\n", "c", "Clear all failed tasks"))
-	content.WriteString(fmt.Sprintf("  %-15s %s\n", "l", "View logs"))
+	fmt.Fprintf(&content, "  %-15s %s\n", "d", "Remove selected task")
+	fmt.Fprintf(&content, "  %-15s %s\n", "c", "Clear all failed tasks")
+	fmt.Fprintf(&content, "  %-15s %s\n", "l", "View logs")
 	content.WriteString("\n")
 
 	// Log View keys
 	content.WriteString("Log View\n")
-	content.WriteString(fmt.Sprintf("  %-15s %s\n", "c", "Clear all log messages"))
+	fmt.Fprintf(&content, "  %-15s %s\n", "c", "Clear all log messages")
 	content.WriteString("\n")
 
 	// Status icons legend - unified section
@@ -4362,7 +4362,7 @@ func (m Model) renderFeedInfo() string {
 	}
 
 	for _, item := range info {
-		b.WriteString(fmt.Sprintf("%-23s: %s\n", item.label, item.value))
+		fmt.Fprintf(&b, "%-23s: %s\n", item.label, item.value)
 	}
 
 	// Calculate padding to push status bar to bottom
