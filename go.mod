@@ -5,7 +5,7 @@ go 1.25.2
 require (
 	github.com/JohannesKaufmann/html-to-markdown/v2 v2.5.0
 	github.com/charmbracelet/bubbletea v1.3.10
-	github.com/charmbracelet/glamour v0.10.0
+	github.com/charmbracelet/glamour/v2 v2.0.0
 	github.com/charmbracelet/lipgloss v1.1.1-0.20260209063657-1e3ee3483a90
 	github.com/google/uuid v1.6.0
 	github.com/mmcdole/gofeed v1.3.0
