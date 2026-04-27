@@ -2058,16 +2058,6 @@ func (m Model) renderFilteredLine(prefix string, unread, total int64, suffix str
 	return prefix + strings.Repeat(" ", pad) + "(" + unreadStr + fmt.Sprintf("/%d)", total) + suffix
 }
 
-func (m Model) folderHasFilterConfigured(folderName string) bool {
-	if _, ok := m.filterMap[filters.FolderKey(folderName)]; ok {
-		return true
-	}
-	if _, ok := m.filterMap["global"]; ok {
-		return true
-	}
-	return false
-}
-
 func (m Model) folderHasFilter(folderName string) bool {
 	for _, item := range m.feedList {
 		if !item.IsFolder && item.IsUnderFolder && item.Feed != nil {
@@ -2406,7 +2396,7 @@ func (m Model) renderFeedList() string {
 				folderIcon = "📁" // Closed folder
 			}
 			hasFilter := m.folderHasFilter(item.FolderName)
-			filterConfigured := m.folderHasFilterConfigured(item.FolderName)
+			_, filterConfigured := m.filterMap[filters.FolderKey(item.FolderName)]
 			displayUnread := item.UnreadItems
 			if hasFilter {
 				displayUnread = m.filteredFolderUnread(item.FolderName)
@@ -2441,8 +2431,7 @@ func (m Model) renderFeedList() string {
 			}
 		} else {
 			feed := *item.Feed
-			feedFolders, _ := m.feedManager.GetFeedFolders(feed.ID)
-			filterConfigured := filters.HasActiveFilter(m.filterMap, feed.ID, feedFolders)
+			_, filterConfigured := m.filterMap[filters.FeedKey(feed.ID)]
 
 			var statusEmoji string
 			if feed.LastError.Valid && feed.LastError.String != "" && !m.refreshingFeeds[feed.ID] {
