@@ -1,3 +1,10 @@
+## [3.2.1](https://github.com/jarv/newsgoat/compare/v3.2.0...v3.2.1) (2026-04-27)
+
+
+### Bug Fixes
+
+* configure git identity in homebrew publish script for CI ([b4e4402](https://github.com/jarv/newsgoat/commit/b4e44022b1669e55467525555e71526f05c2c28e))
+
 # [3.2.0](https://github.com/jarv/newsgoat/compare/v3.1.0...v3.2.0) (2026-04-27)
 
 
