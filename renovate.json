@@ -11,7 +11,17 @@
     "integration-tests"
   ],
   "recreateWhen": "always",
+  "minimumReleaseAge": "3 days",
   "packageRules": [
+    {
+      "matchPackagePatterns": [
+        "*"
+      ],
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "enabled": false
+    },
     {
       "matchPackagePatterns": [
         "*"
