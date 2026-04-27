@@ -1,3 +1,10 @@
+## [3.3.2](https://github.com/jarv/newsgoat/compare/v3.3.1...v3.3.2) (2026-04-27)
+
+
+### Bug Fixes
+
+* only color feed unread count when filter actually changed it ([6d4a290](https://github.com/jarv/newsgoat/commit/6d4a290d708bfda0b074429db008ade60f30c779))
+
 ## [3.3.1](https://github.com/jarv/newsgoat/compare/v3.3.0...v3.3.1) (2026-04-27)
 
 
