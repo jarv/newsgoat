@@ -1,3 +1,10 @@
+## [3.5.3](https://github.com/jarv/newsgoat/compare/v3.5.2...v3.5.3) (2026-04-27)
+
+
+### Bug Fixes
+
+* use filtered unread count for N indicator in feed list ([81a0abd](https://github.com/jarv/newsgoat/commit/81a0abdf1bd37050a769444e91a93221484b3c73))
+
 ## [3.5.2](https://github.com/jarv/newsgoat/compare/v3.5.1...v3.5.2) (2026-04-27)
 
 
