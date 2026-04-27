@@ -1,3 +1,10 @@
+## [3.5.4](https://github.com/jarv/newsgoat/compare/v3.5.3...v3.5.4) (2026-04-27)
+
+
+### Bug Fixes
+
+* preserve backslashes in filter YAML round-trip ([f341364](https://github.com/jarv/newsgoat/commit/f341364380328de03648df53770e22c7275882e0))
+
 ## [3.5.3](https://github.com/jarv/newsgoat/compare/v3.5.2...v3.5.3) (2026-04-27)
 
 
