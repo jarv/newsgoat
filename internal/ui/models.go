@@ -2044,19 +2044,17 @@ func (m Model) filteredFolderUnread(folderName string, originalUnread int64) int
 	}
 	var total int64
 	hasCounts := false
-	for _, item := range m.feedList {
-		if !item.IsFolder && item.IsUnderFolder && item.Feed != nil {
-			feedFolders, _ := m.feedManager.GetFeedFolders(item.Feed.ID)
-			for _, f := range feedFolders {
-				if f == folderName {
-					if count, ok := m.filteredUnreadCounts[item.Feed.ID]; ok {
-						total += count
-						hasCounts = true
-					} else {
-						total += item.Feed.UnreadItems
-					}
-					break
+	for _, feed := range m.allFeeds {
+		feedFolders, _ := m.feedManager.GetFeedFolders(feed.ID)
+		for _, f := range feedFolders {
+			if f == folderName {
+				if count, ok := m.filteredUnreadCounts[feed.ID]; ok {
+					total += count
+					hasCounts = true
+				} else {
+					total += feed.UnreadItems
 				}
+				break
 			}
 		}
 	}
