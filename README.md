@@ -107,7 +107,14 @@ git commit --no-verify
 
 ## Install
 
-### Quick Install (Recommended)
+### Homebrew (macOS)
+
+```bash
+brew tap jarv/newsgoat
+brew install newsgoat
+```
+
+### Quick Install
 
 Install with a single command (macOS and Linux):
 
