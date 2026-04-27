@@ -1,3 +1,10 @@
+# [3.4.0](https://github.com/jarv/newsgoat/compare/v3.3.2...v3.4.0) (2026-04-27)
+
+
+### Features
+
+* add ✦ indicator for feeds/folders with a configured filter ([344f752](https://github.com/jarv/newsgoat/commit/344f752fb49f24497fd303fa465dcc4b9be2e236))
+
 ## [3.3.2](https://github.com/jarv/newsgoat/compare/v3.3.1...v3.3.2) (2026-04-27)
 
 
