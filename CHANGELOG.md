@@ -1,3 +1,10 @@
+## [3.0.11](https://github.com/jarv/newsgoat/compare/v3.0.10...v3.0.11) (2026-04-27)
+
+
+### Bug Fixes
+
+* **deps:** update module github.com/ncruces/go-sqlite3 to v0.34.0 ([#120](https://github.com/jarv/newsgoat/issues/120)) ([d325c43](https://github.com/jarv/newsgoat/commit/d325c43fb0a97ab9a405f016d79a61e18e14adf7))
+
 ## [3.0.10](https://github.com/jarv/newsgoat/compare/v3.0.9...v3.0.10) (2026-04-09)
 
 
