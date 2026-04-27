@@ -1,3 +1,10 @@
+# [3.3.0](https://github.com/jarv/newsgoat/compare/v3.2.1...v3.3.0) (2026-04-27)
+
+
+### Features
+
+* add regex-based filters for feeds and folders ([#137](https://github.com/jarv/newsgoat/issues/137)) ([3ad29ca](https://github.com/jarv/newsgoat/commit/3ad29ca218636617b7607a204a3cf5400ef8a55d))
+
 ## [3.2.1](https://github.com/jarv/newsgoat/compare/v3.2.0...v3.2.1) (2026-04-27)
 
 
