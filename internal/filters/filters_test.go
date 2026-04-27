@@ -158,6 +158,20 @@ func TestRuleToYAML_RoundTrip(t *testing.T) {
 	}
 }
 
+func TestRuleToYAML_RoundTrip_Backslashes(t *testing.T) {
+	rule := Rule{
+		Description: []string{`Ep\.\s*\d+`},
+	}
+	yaml := RuleToYAML(rule, "test")
+	parsed, err := ParseYAML(yaml)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(parsed.Description) != 1 || parsed.Description[0] != `Ep\.\s*\d+` {
+		t.Errorf("backslash round-trip failed: got %q, want %q", parsed.Description[0], `Ep\.\s*\d+`)
+	}
+}
+
 func TestParseYAML_Empty(t *testing.T) {
 	rule, err := ParseYAML("# just comments\nURL:\nTitle:\nDescription:\n")
 	if err != nil {

@@ -221,7 +221,7 @@ func RuleToYAML(rule Rule, scopeLabel string) string {
 func writeYAMLField(b *strings.Builder, name string, values []string) {
 	b.WriteString(name + ":\n")
 	for _, v := range values {
-		fmt.Fprintf(b, "  - %q\n", v)
+		fmt.Fprintf(b, "  - \"%s\"\n", v)
 	}
 }
 
