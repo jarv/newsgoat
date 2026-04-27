@@ -19,7 +19,6 @@ import (
 	"github.com/jarv/newsgoat/internal/logging"
 	"github.com/jarv/newsgoat/internal/tasks"
 	"github.com/jarv/newsgoat/internal/themes"
-	"github.com/jarv/newsgoat/internal/updater"
 	"github.com/jarv/newsgoat/internal/version"
 )
 
@@ -207,7 +206,6 @@ type Model struct {
 	selectingSuppressFirstReload    bool                                 // Track if we're selecting suppress first reload
 	selectingReloadOnStartup        bool                                 // Track if we're selecting reload on startup
 	selectingUnreadOnTop            bool                                 // Track if we're selecting unread on top
-	selectingCheckForUpdates        bool                                 // Track if we're selecting check for updates
 	showRawHTML                     bool                                 // Track if showing raw HTML in article view
 	themeSelectCursor               int                                  // Cursor position in theme selector
 	highlightSelectCursor           int                                  // Cursor position in highlight style selector
@@ -217,7 +215,6 @@ type Model struct {
 	suppressFirstReloadSelectCursor int                                  // Cursor position in suppress first reload selector
 	reloadOnStartupSelectCursor     int                                  // Cursor position in reload on startup selector
 	unreadOnTopSelectCursor         int                                  // Cursor position in unread on top selector
-	checkForUpdatesSelectCursor     int                                  // Cursor position in check for updates selector
 	settingInput                    string                               // Current input value when editing
 	showSettingsHelp                bool                                 // Track if we're showing settings help
 	searchMode                      bool                                 // Track if search mode is active
@@ -232,16 +229,6 @@ type Model struct {
 	ctrlCPressed                    bool                                 // Track if 'ctrl+c' was pressed once (for quit confirmation)
 	addingURL                       bool                                 // Track if in URL adding mode
 	urlInput                        string                               // Current URL input text
-	updateAvailable                 bool                                 // Track if an update is available
-	updateInfo                      *UpdateInfo                          // Information about available update
-	installingUpdate                bool                                 // Track if update is being installed
-}
-
-// UpdateInfo holds information about an available update
-type UpdateInfo struct {
-	CurrentVersion string
-	LatestVersion  string
-	DownloadURL    string
 }
 
 type RefreshMsg struct {
@@ -346,26 +333,6 @@ type RestartReloadTimerMsg struct{}
 
 type CountdownTickMsg struct{}
 
-type CheckUpdateMsg struct{}
-
-type UpdateAvailableMsg struct {
-	CurrentVersion string
-	LatestVersion  string
-	DownloadURL    string
-}
-
-type UpdateCheckErrorMsg struct {
-	err error
-}
-
-type UpdateInstallStartMsg struct{}
-
-type UpdateInstallCompleteMsg struct{}
-
-type UpdateInstallErrorMsg struct {
-	err error
-}
-
 // createGlamourRenderer creates a glamour renderer with the given theme
 // and configures it to hide link URLs (since we add [1], [2] markers manually)
 func createGlamourRenderer(themeName string) (*glamour.TermRenderer, error) {
@@ -436,11 +403,6 @@ func (m Model) Init() tea.Cmd {
 		loadFeedList(m.feedManager),
 		listenForTaskEvents(m.taskManager),
 	)
-
-	// Check for updates on startup if enabled
-	if m.config.CheckForUpdates {
-		cmds = append(cmds, checkForUpdate())
-	}
 
 	// Start the reload timer if auto reload is enabled
 	if m.config.AutoReload && m.config.ReloadTime > 0 {
@@ -932,41 +894,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.statusMessageType = "error"
 		return m, nil
 
-	case UpdateAvailableMsg:
-		// Store update information and show notification
-		m.updateAvailable = true
-		m.updateInfo = &UpdateInfo{
-			CurrentVersion: msg.CurrentVersion,
-			LatestVersion:  msg.LatestVersion,
-			DownloadURL:    msg.DownloadURL,
-		}
-		m.statusMessage = "Update available: " + msg.LatestVersion + " (press ctrl-u to upgrade)"
-		m.statusMessageType = "info"
-		return m, nil
-
-	case UpdateCheckErrorMsg:
-		// Silently ignore update check errors (don't disturb the user)
-		logging.Debug("Update check failed", "error", msg.err)
-		return m, nil
-
-	case UpdateInstallStartMsg:
-		m.installingUpdate = true
-		m.statusMessage = "Installing update..."
-		m.statusMessageType = "info"
-		return m, nil
-
-	case UpdateInstallCompleteMsg:
-		m.statusMessage = "Update installed successfully! Please restart the application."
-		m.statusMessageType = "info"
-		m.installingUpdate = false
-		return m, nil
-
-	case UpdateInstallErrorMsg:
-		m.statusMessage = "Update installation failed: " + msg.err.Error()
-		m.statusMessageType = "error"
-		m.installingUpdate = false
-		return m, nil
-
 	case ErrorMsg:
 		m.err = msg.Err
 		m.refreshing = false
@@ -1272,20 +1199,6 @@ func (m Model) handleFeedListKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 
 	case "ctrl+u":
-		// If update is available, install it (takes priority)
-		if m.updateAvailable && m.updateInfo != nil && !m.installingUpdate {
-			// Check write permission before attempting update
-			if err := updater.CheckWritePermission(); err != nil {
-				m.statusMessage = fmt.Sprintf("Update failed: %v", err)
-				m.statusMessageType = "error"
-				return m, nil
-			}
-			m.installingUpdate = true
-			m.statusMessage = "Installing update..."
-			m.statusMessageType = "info"
-			return m, installUpdate(m.updateInfo.DownloadURL)
-		}
-		// Otherwise, scroll up by half a page
 		if len(m.feedList) > 0 {
 			pageSize := m.height / 2
 			if pageSize < 1 {
@@ -3226,7 +3139,6 @@ func (m Model) renderHelpView() string {
 	fmt.Fprintf(&content, "  %-15s %s\n", "R", "Refresh all feeds")
 	fmt.Fprintf(&content, "  %-15s %s\n", "A", "Mark all items in feed as read")
 	fmt.Fprintf(&content, "  %-15s %s\n", "i", "Show feed info")
-	fmt.Fprintf(&content, "  %-15s %s\n", "ctrl+u", "Upgrade to new version (when available)")
 	fmt.Fprintf(&content, "  %-15s %s\n", "/", "Global search (text of all feeds)")
 	fmt.Fprintf(&content, "  %-15s %s\n", "ctrl+f", "Title search only")
 	fmt.Fprintf(&content, "  %-15s %s\n", "u", "Add URL (with discovery)")
@@ -3725,33 +3637,6 @@ func (m Model) handleSettingsViewKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) 
 		return m, nil
 	}
 
-	// If we're selecting check for updates, handle selector navigation
-	if m.selectingCheckForUpdates {
-		switch msg.String() {
-		case "esc":
-			m.selectingCheckForUpdates = false
-			return m, nil
-		case "j", "down":
-			if m.checkForUpdatesSelectCursor < 1 {
-				m.checkForUpdatesSelectCursor++
-			}
-			return m, nil
-		case "k", "up":
-			if m.checkForUpdatesSelectCursor > 0 {
-				m.checkForUpdatesSelectCursor--
-			}
-			return m, nil
-		case "enter":
-			m.config.CheckForUpdates = (m.checkForUpdatesSelectCursor == 0)
-			if err := config.SaveConfig(m.queries, m.config); err != nil {
-				m.err = err
-			}
-			m.selectingCheckForUpdates = false
-			return m, nil
-		}
-		return m, nil
-	}
-
 	// If we're editing reload concurrency, handle input
 	if m.editingSettings {
 		switch msg.Code {
@@ -3822,8 +3707,8 @@ func (m Model) handleSettingsViewKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) 
 		return m, loadFeedList(m.feedManager)
 
 	case "j", "down":
-		// 11 total settings
-		if m.cursor < 10 {
+		// 10 total settings
+		if m.cursor < 9 {
 			m.cursor++
 			m.savedSettingsCursor = m.cursor
 		}
@@ -3913,14 +3798,6 @@ func (m Model) handleSettingsViewKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) 
 				m.unreadOnTopSelectCursor = 0
 			} else {
 				m.unreadOnTopSelectCursor = 1
-			}
-		} else if m.cursor == 10 {
-			// Check for updates - open selector
-			m.selectingCheckForUpdates = true
-			if m.config.CheckForUpdates {
-				m.checkForUpdatesSelectCursor = 0
-			} else {
-				m.checkForUpdatesSelectCursor = 1
 			}
 		}
 		return m, nil
@@ -4105,24 +3982,6 @@ func (m Model) renderSettingsView() string {
 		return b.String()
 	}
 
-	// If selecting check for updates, show selector
-	if m.selectingCheckForUpdates {
-		b.WriteString("Check For Updates:\n")
-		b.WriteString(m.getHelpStyle().Render("Check for new versions when the application starts"))
-		b.WriteString("\n\n")
-		options := []string{"yes", "no"}
-		for i, option := range options {
-			line := option
-			line = m.applyHighlight(line, i == m.checkForUpdatesSelectCursor)
-			b.WriteString(line)
-			b.WriteString("\n")
-		}
-
-		b.WriteString(strings.Repeat("\n", m.height-8))
-		b.WriteString(m.getHelpStyle().Render("enter: select | esc: cancel"))
-		return b.String()
-	}
-
 	// If showing settings help, show help text
 	if m.showSettingsHelp {
 		b.WriteString("Settings Help:\n\n")
@@ -4137,7 +3996,6 @@ func (m Model) renderSettingsView() string {
 			"Spinner Type: Animation style for the loading spinner",
 			"Show Read Feeds: Show feeds with no unread items in the list",
 			"Unread On Top: Show feeds with unread items at the top of the feed list",
-			"Check For Updates: Check for new versions when the application starts",
 		}
 		for _, line := range help {
 			wrapped := wrapText(line, m.width-4)
@@ -4181,10 +4039,6 @@ func (m Model) renderSettingsView() string {
 	if !m.config.UnreadOnTop {
 		unreadOnTopStr = "no"
 	}
-	checkForUpdatesStr := "yes"
-	if !m.config.CheckForUpdates {
-		checkForUpdatesStr = "no"
-	}
 	reloadTimeStr := fmt.Sprintf("%d minutes", m.config.ReloadTime)
 	if m.config.ReloadTime == 0 {
 		reloadTimeStr = "disabled"
@@ -4215,7 +4069,6 @@ func (m Model) renderSettingsView() string {
 		{"Spinner Type", m.config.SpinnerType},
 		{"Show Read Feeds", showReadFeedsStr},
 		{"Unread On Top", unreadOnTopStr},
-		{"Check For Updates", checkForUpdatesStr},
 	}
 
 	// Render settings

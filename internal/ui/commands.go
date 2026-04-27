@@ -14,7 +14,6 @@ import (
 	"github.com/jarv/newsgoat/internal/feeds"
 	"github.com/jarv/newsgoat/internal/logging"
 	"github.com/jarv/newsgoat/internal/tasks"
-	"github.com/jarv/newsgoat/internal/updater"
 )
 
 func loadFeedList(feedManager *feeds.Manager) tea.Cmd {
@@ -560,35 +559,5 @@ func performSearch(feedManager *feeds.Manager, viewState ViewState, feedID int64
 		}
 
 		return SearchResultsMsg{}
-	}
-}
-
-func checkForUpdate() tea.Cmd {
-	return func() tea.Msg {
-		updateInfo, err := updater.CheckForUpdate()
-		if err != nil {
-			logging.Debug("Update check failed", "error", err)
-			return UpdateCheckErrorMsg{err: err}
-		}
-		if updateInfo == nil {
-			// No update available
-			return nil
-		}
-		return UpdateAvailableMsg{
-			CurrentVersion: updateInfo.CurrentVersion,
-			LatestVersion:  updateInfo.LatestVersion,
-			DownloadURL:    updateInfo.DownloadURL,
-		}
-	}
-}
-
-func installUpdate(downloadURL string) tea.Cmd {
-	return func() tea.Msg {
-		err := updater.DownloadAndInstall(downloadURL)
-		if err != nil {
-			logging.Error("Update installation failed", "error", err)
-			return UpdateInstallErrorMsg{err: err}
-		}
-		return UpdateInstallCompleteMsg{}
 	}
 }
