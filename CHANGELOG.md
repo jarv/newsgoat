@@ -1,3 +1,12 @@
+## [3.3.1](https://github.com/jarv/newsgoat/compare/v3.3.0...v3.3.1) (2026-04-27)
+
+
+### Bug Fixes
+
+* keep unread style (blue) based on original count, only color the count orange when filtered ([7321356](https://github.com/jarv/newsgoat/commit/73213566576abcc2952871c3402995c82082066e))
+* render filtered count orange inline without breaking unread blue style ([b563a71](https://github.com/jarv/newsgoat/commit/b563a71c2ee5097d5089e86f28beddf71d1ff326))
+* use title bar color for filtered unread count instead of orange ([9c8a10a](https://github.com/jarv/newsgoat/commit/9c8a10a341a1ff8c95ed4e6b0b7477151ce995e3))
+
 # [3.3.0](https://github.com/jarv/newsgoat/compare/v3.2.1...v3.3.0) (2026-04-27)
 
 
