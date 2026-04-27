@@ -26,6 +26,7 @@ Meanwhile, “vibe coding” was catching on, and it seemed like a fun excuse to
 - **Flexible sorting**: Option to put feeds with unread items at the top. Press <kbd>c</kbd> to configure.
 - **Auto-discovery**: Automatic feed discovery when adding URLs. Press <kbd>u</kbd> to add a youtube link and automatically subscribe to the channel's feed.
 - **Regex filters**: Define regex patterns to filter items by URL, Title, or Description. Press <kbd>f</kbd> on a feed or folder to configure a filter in `$EDITOR` using YAML syntax, or <kbd>F</kbd> for a global filter. Filters compose with AND logic across global, folder, and feed scopes. Prefix a pattern with `!` to negate it (e.g. `!/shorts/`). Feeds and folders with a configured filter are marked with a ✦ indicator.
+- **OPML import**: Import feeds from an OPML file or URL with `newsgoat import <file|url>`. The import is additive — existing feeds are kept, duplicates are skipped, and folder structure from the OPML is preserved.
 
 ## Feed Auto Discovery
 
