@@ -1,3 +1,10 @@
+## [3.5.2](https://github.com/jarv/newsgoat/compare/v3.5.1...v3.5.2) (2026-04-27)
+
+
+### Bug Fixes
+
+* use allFeeds instead of feedList for folder unread counts ([1afe48c](https://github.com/jarv/newsgoat/commit/1afe48cf75bd0d1b490a9f6d8691b9ee34858b7d))
+
 ## [3.5.1](https://github.com/jarv/newsgoat/compare/v3.5.0...v3.5.1) (2026-04-27)
 
 
