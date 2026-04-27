@@ -2059,11 +2059,18 @@ func (m Model) renderFilteredLine(prefix string, unread, total int64, suffix str
 }
 
 func (m Model) folderHasFilter(folderName string) bool {
-	if _, ok := m.filterMap[filters.FolderKey(folderName)]; ok {
-		return true
-	}
-	if _, ok := m.filterMap["global"]; ok {
-		return true
+	for _, item := range m.feedList {
+		if !item.IsFolder && item.IsUnderFolder && item.Feed != nil {
+			folders, _ := m.feedManager.GetFeedFolders(item.Feed.ID)
+			for _, f := range folders {
+				if f == folderName {
+					if _, ok := m.filteredUnreadCounts[item.Feed.ID]; ok {
+						return true
+					}
+					break
+				}
+			}
+		}
 	}
 	return false
 }

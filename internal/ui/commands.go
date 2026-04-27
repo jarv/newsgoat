@@ -630,7 +630,9 @@ func computeFilteredCounts(feedManager *feeds.Manager, fm filters.FilterMap) tea
 					unread++
 				}
 			}
-			counts[feed.ID] = unread
+			if unread != feed.UnreadItems {
+				counts[feed.ID] = unread
+			}
 		}
 		return FilteredCountsMsg{Counts: counts}
 	}
