@@ -232,7 +232,6 @@ type Model struct {
 	addingURL                       bool                                 // Track if in URL adding mode
 	urlInput                        string                               // Current URL input text
 	filterMap                       filters.FilterMap
-	filteredUnreadCounts            map[int64]int64
 }
 
 type RefreshMsg struct {
@@ -346,10 +345,6 @@ type FilterEditorErrorMsg struct {
 	Err string
 }
 
-type FilteredCountsMsg struct {
-	Counts map[int64]int64
-}
-
 // createGlamourRenderer creates a glamour renderer with the given theme
 // and configures it to hide link URLs (since we add [1], [2] markers manually)
 func createGlamourRenderer(themeName string) (*glamour.TermRenderer, error) {
@@ -412,7 +407,6 @@ func NewModel(feedManager *feeds.Manager, taskManager tasks.Manager, queries *da
 		expandedFolders:      make(map[string]bool),
 		folderStats:          make(map[string]struct{ UnreadItems, TotalItems int64 }),
 		filterMap:            loadFiltersSync(queries),
-		filteredUnreadCounts: make(map[int64]int64),
 	}
 }
 
@@ -431,10 +425,6 @@ func (m Model) Init() tea.Cmd {
 		loadFeedList(m.feedManager),
 		listenForTaskEvents(m.taskManager),
 	)
-
-	if len(m.filterMap) > 0 {
-		cmds = append(cmds, computeFilteredCounts(m.feedManager, m.filterMap))
-	}
 
 	// Start the reload timer if auto reload is enabled
 	if m.config.AutoReload && m.config.ReloadTime > 0 {
@@ -523,10 +513,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.pendingStartupReload && len(m.allFeeds) > 0 {
 			m.pendingStartupReload = false
 			return m, func() tea.Msg { return ReloadTimerMsg{} }
-		}
-
-		if len(m.filterMap) > 0 {
-			return m, computeFilteredCounts(m.feedManager, m.filterMap)
 		}
 
 		return m, nil
@@ -689,18 +675,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.statusMessage = "Filter updated"
 		m.statusMessageType = "info"
-		return m, computeFilteredCounts(m.feedManager, m.filterMap)
+		return m, nil
 
 	case FilterEditorErrorMsg:
 		m.statusMessage = msg.Err
 		m.statusMessageType = "error"
-		return m, nil
-
-	case FilteredCountsMsg:
-		m.filteredUnreadCounts = msg.Counts
-		if m.filteredUnreadCounts == nil {
-			m.filteredUnreadCounts = make(map[int64]int64)
-		}
 		return m, nil
 
 	case FeedInfoLoadedMsg:
@@ -2038,63 +2017,6 @@ func (m Model) getUnreadStyle() lipgloss.Style {
 	return lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("2"))
 }
 
-func (m Model) renderFilteredLine(prefix string, unread, total int64, suffix string, hasUnread bool) string {
-	theme := themes.GetThemeByName(m.config.ThemeName)
-	filterCountStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(theme.TitleColor))
-	unreadStr := filterCountStyle.Render(fmt.Sprintf("%d", unread))
-
-	plainCountStr := fmt.Sprintf("(%d/%d)", unread, total)
-	pad := 9 - len(plainCountStr)
-	if pad < 0 {
-		pad = 0
-	}
-
-	if hasUnread {
-		style := m.getUnreadStyle()
-		return style.Render(prefix+strings.Repeat(" ", pad)+"(") +
-			unreadStr +
-			style.Render(fmt.Sprintf("/%d)", total)+suffix)
-	}
-	return prefix + strings.Repeat(" ", pad) + "(" + unreadStr + fmt.Sprintf("/%d)", total) + suffix
-}
-
-func (m Model) folderHasFilter(folderName string) bool {
-	for _, item := range m.feedList {
-		if !item.IsFolder && item.IsUnderFolder && item.Feed != nil {
-			folders, _ := m.feedManager.GetFeedFolders(item.Feed.ID)
-			for _, f := range folders {
-				if f == folderName {
-					if _, ok := m.filteredUnreadCounts[item.Feed.ID]; ok {
-						return true
-					}
-					break
-				}
-			}
-		}
-	}
-	return false
-}
-
-func (m Model) filteredFolderUnread(folderName string) int64 {
-	var total int64
-	for _, item := range m.feedList {
-		if !item.IsFolder && item.IsUnderFolder && item.Feed != nil {
-			folders, _ := m.feedManager.GetFeedFolders(item.Feed.ID)
-			for _, f := range folders {
-				if f == folderName {
-					if count, ok := m.filteredUnreadCounts[item.Feed.ID]; ok {
-						total += count
-					} else {
-						total += item.Feed.UnreadItems
-					}
-					break
-				}
-			}
-		}
-	}
-	return total
-}
-
 // buildFeedDisplayList creates a flat list of folders and feeds for display
 func (m *Model) buildFeedDisplayList(feeds []database.GetFeedStatsRow) {
 	// Group feeds by folders
@@ -2395,35 +2317,18 @@ func (m Model) renderFeedList() string {
 			} else {
 				folderIcon = "📁" // Closed folder
 			}
-			hasFilter := m.folderHasFilter(item.FolderName)
 			_, filterConfigured := m.filterMap[filters.FolderKey(item.FolderName)]
-			displayUnread := item.UnreadItems
-			if hasFilter {
-				displayUnread = m.filteredFolderUnread(item.FolderName)
-			}
-
 			gap := "  "
 			if filterConfigured {
 				gap = "✦ "
 			}
+			countStr := fmt.Sprintf("(%d/%d)", item.UnreadItems, item.TotalItems)
+			paddedCount := fmt.Sprintf("%9s", countStr)
+			line = folderIcon + gap + paddedCount + " " + item.FolderName
 
 			if i == m.cursor {
-				countStr := fmt.Sprintf("(%d/%d)", displayUnread, item.TotalItems)
-				paddedCount := fmt.Sprintf("%9s", countStr)
-				line = folderIcon + gap + paddedCount + " " + item.FolderName
 				line = m.applyHighlight(line, true)
-			} else if hasFilter {
-				line = m.renderFilteredLine(
-					folderIcon+gap,
-					displayUnread, item.TotalItems,
-					" "+item.FolderName,
-					item.UnreadItems > 0,
-				)
-				line = m.applyHighlight(line, false)
 			} else {
-				countStr := fmt.Sprintf("(%d/%d)", displayUnread, item.TotalItems)
-				paddedCount := fmt.Sprintf("%9s", countStr)
-				line = folderIcon + gap + paddedCount + " " + item.FolderName
 				if item.UnreadItems > 0 {
 					line = m.getUnreadStyle().Render(line)
 				}
@@ -2435,25 +2340,24 @@ func (m Model) renderFeedList() string {
 
 			var statusEmoji string
 			if feed.LastError.Valid && feed.LastError.String != "" && !m.refreshingFeeds[feed.ID] {
-				// Try to determine error type from error message
 				errorMsg := feed.LastError.String
 				if strings.Contains(errorMsg, "404") {
-					statusEmoji = "🔍" // Not found
+					statusEmoji = "🔍"
 				} else if strings.Contains(errorMsg, "403") {
-					statusEmoji = "🚫" // Forbidden
+					statusEmoji = "🚫"
 				} else if strings.Contains(errorMsg, "429") {
-					statusEmoji = "⏱️" // Too many requests
+					statusEmoji = "⏱️"
 				} else if strings.Contains(errorMsg, "500") || strings.Contains(errorMsg, "502") || strings.Contains(errorMsg, "503") {
-					statusEmoji = "⚠️" // Server error
+					statusEmoji = "⚠️"
 				} else if strings.Contains(errorMsg, "timeout") || strings.Contains(errorMsg, "context deadline exceeded") {
-					statusEmoji = "⌛" // Timeout
+					statusEmoji = "⌛"
 				} else {
-					statusEmoji = "❌" // Generic error
+					statusEmoji = "❌"
 				}
 			} else if feed.UnreadItems > 0 {
-				statusEmoji = "N " // Unread items - extra space to match emoji width
+				statusEmoji = "N "
 			} else {
-				statusEmoji = "  " // All read - two spaces to match emoji width
+				statusEmoji = "  "
 			}
 
 			var spinner string
@@ -2466,11 +2370,8 @@ func (m Model) renderFeedList() string {
 				spinner = "  "
 			}
 
-			_, hasFeedFilter := m.filteredUnreadCounts[feed.ID]
-			displayUnread := feed.UnreadItems
-			if hasFeedFilter {
-				displayUnread = m.filteredUnreadCounts[feed.ID]
-			}
+			countStr := fmt.Sprintf("(%d/%d)", feed.UnreadItems, feed.TotalItems)
+			paddedCount := fmt.Sprintf("%9s", countStr)
 
 			displayTitle := getDisplayTitle(feed)
 
@@ -2481,25 +2382,11 @@ func (m Model) renderFeedList() string {
 				prefix = ""
 			}
 
-			linePrefix := prefix + statusEmoji + spinner
+			line = prefix + statusEmoji + spinner + paddedCount + " " + displayTitle
 
 			if i == m.cursor {
-				countStr := fmt.Sprintf("(%d/%d)", displayUnread, feed.TotalItems)
-				paddedCount := fmt.Sprintf("%9s", countStr)
-				line = linePrefix + paddedCount + " " + displayTitle
 				line = m.applyHighlight(line, true)
-			} else if hasFeedFilter {
-				line = m.renderFilteredLine(
-					linePrefix,
-					displayUnread, feed.TotalItems,
-					" "+displayTitle,
-					feed.UnreadItems > 0,
-				)
-				line = m.applyHighlight(line, false)
 			} else {
-				countStr := fmt.Sprintf("(%d/%d)", displayUnread, feed.TotalItems)
-				paddedCount := fmt.Sprintf("%9s", countStr)
-				line = linePrefix + paddedCount + " " + displayTitle
 				if feed.UnreadItems > 0 {
 					line = m.getUnreadStyle().Render(line)
 				}
