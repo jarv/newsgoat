@@ -598,3 +598,40 @@ func openFilterInEditor(fm filters.FilterMap, scope string, scopeLabel string) t
 		})()
 	}
 }
+
+func computeFilteredCounts(feedManager *feeds.Manager, fm filters.FilterMap) tea.Cmd {
+	return func() tea.Msg {
+		if len(fm) == 0 {
+			return FilteredCountsMsg{}
+		}
+		stats, err := feedManager.GetFeedStats()
+		if err != nil {
+			logging.Error("computeFilteredCounts: failed to get feed stats", "error", err)
+			return FilteredCountsMsg{}
+		}
+		counts := make(map[int64]int64, len(stats))
+		for _, feed := range stats {
+			folders, _ := feedManager.GetFeedFolders(feed.ID)
+			rules := filters.RulesForFeed(fm, feed.ID, folders)
+			if len(rules) == 0 {
+				continue
+			}
+			compiled := filters.CompileRules(rules)
+			items, err := feedManager.GetItemsWithReadStatus(feed.ID)
+			if err != nil {
+				continue
+			}
+			var unread int64
+			for _, item := range items {
+				if item.Read {
+					continue
+				}
+				if filters.MatchItem(item.Link, item.Title, item.Description, compiled) {
+					unread++
+				}
+			}
+			counts[feed.ID] = unread
+		}
+		return FilteredCountsMsg{Counts: counts}
+	}
+}
