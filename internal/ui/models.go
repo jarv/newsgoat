@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -16,6 +17,7 @@ import (
 	"github.com/jarv/newsgoat/internal/database"
 	"github.com/jarv/newsgoat/internal/discovery"
 	"github.com/jarv/newsgoat/internal/feeds"
+	"github.com/jarv/newsgoat/internal/filters"
 	"github.com/jarv/newsgoat/internal/logging"
 	"github.com/jarv/newsgoat/internal/tasks"
 	"github.com/jarv/newsgoat/internal/themes"
@@ -229,6 +231,8 @@ type Model struct {
 	ctrlCPressed                    bool                                 // Track if 'ctrl+c' was pressed once (for quit confirmation)
 	addingURL                       bool                                 // Track if in URL adding mode
 	urlInput                        string                               // Current URL input text
+	filterMap                       filters.FilterMap
+	filteredUnreadCounts            map[int64]int64
 }
 
 type RefreshMsg struct {
@@ -333,6 +337,19 @@ type RestartReloadTimerMsg struct{}
 
 type CountdownTickMsg struct{}
 
+type FilterEditorFinishedMsg struct {
+	Scope        string
+	TempFilePath string
+}
+
+type FilterEditorErrorMsg struct {
+	Err string
+}
+
+type FilteredCountsMsg struct {
+	Counts map[int64]int64
+}
+
 // createGlamourRenderer creates a glamour renderer with the given theme
 // and configures it to hide link URLs (since we add [1], [2] markers manually)
 func createGlamourRenderer(themeName string) (*glamour.TermRenderer, error) {
@@ -394,7 +411,18 @@ func NewModel(feedManager *feeds.Manager, taskManager tasks.Manager, queries *da
 		pendingStartupReload: cfg.ReloadOnStartup, // Will trigger reload after feed list loads
 		expandedFolders:      make(map[string]bool),
 		folderStats:          make(map[string]struct{ UnreadItems, TotalItems int64 }),
+		filterMap:            loadFiltersSync(queries),
+		filteredUnreadCounts: make(map[int64]int64),
 	}
+}
+
+func loadFiltersSync(queries *database.Queries) filters.FilterMap {
+	fm, err := filters.Load(queries)
+	if err != nil {
+		logging.Error("Failed to load filters", "error", err)
+		return make(filters.FilterMap)
+	}
+	return fm
 }
 
 func (m Model) Init() tea.Cmd {
@@ -403,6 +431,10 @@ func (m Model) Init() tea.Cmd {
 		loadFeedList(m.feedManager),
 		listenForTaskEvents(m.taskManager),
 	)
+
+	if len(m.filterMap) > 0 {
+		cmds = append(cmds, computeFilteredCounts(m.feedManager, m.filterMap))
+	}
 
 	// Start the reload timer if auto reload is enabled
 	if m.config.AutoReload && m.config.ReloadTime > 0 {
@@ -488,17 +520,35 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Note: if not in FeedListView, don't modify cursor or savedFeedCursor
 		// They will be set appropriately when we transition back to FeedListView
 
-		// Trigger reload on startup if configured and this is the first load
 		if m.pendingStartupReload && len(m.allFeeds) > 0 {
 			m.pendingStartupReload = false
 			return m, func() tea.Msg { return ReloadTimerMsg{} }
+		}
+
+		if len(m.filterMap) > 0 {
+			return m, computeFilteredCounts(m.feedManager, m.filterMap)
 		}
 
 		return m, nil
 
 	case ItemListLoadedMsg:
 		m.itemList = msg.Items
-		m.currentFeed = msg.Feed // Cache feed info for rendering
+		m.currentFeed = msg.Feed
+
+		if len(m.filterMap) > 0 {
+			folders, _ := m.feedManager.GetFeedFolders(msg.Feed.ID)
+			rules := filters.RulesForFeed(m.filterMap, msg.Feed.ID, folders)
+			if len(rules) > 0 {
+				compiled := filters.CompileRules(rules)
+				filtered := make([]database.GetItemsWithReadStatusRow, 0, len(m.itemList))
+				for _, item := range m.itemList {
+					if filters.MatchItem(item.Link, item.Title, item.Description, compiled) {
+						filtered = append(filtered, item)
+					}
+				}
+				m.itemList = filtered
+			}
+		}
 
 		if m.state == ItemListView {
 			// Preserve cursor position when refreshing
@@ -602,8 +652,55 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, syncFeedsFromTempFile(m.feedManager, msg.TempFilePath)
 
 	case EditorErrorMsg:
-		// Display error message
 		m.err = fmt.Errorf("%s", msg.Err)
+		return m, nil
+
+	case FilterEditorFinishedMsg:
+		content, err := os.ReadFile(msg.TempFilePath)
+		_ = os.Remove(msg.TempFilePath)
+		if err != nil {
+			m.statusMessage = "Failed to read filter file: " + err.Error()
+			m.statusMessageType = "error"
+			return m, nil
+		}
+		rule, err := filters.ParseYAML(string(content))
+		if err != nil {
+			m.statusMessage = "Invalid filter: " + err.Error()
+			m.statusMessageType = "error"
+			return m, nil
+		}
+		if filters.IsEmpty(rule) {
+			delete(m.filterMap, msg.Scope)
+		} else {
+			m.filterMap[msg.Scope] = rule
+		}
+		ruleJSON, err := json.Marshal(m.filterMap)
+		if err == nil {
+			if _, err := filters.ParseJSON(ruleJSON); err != nil {
+				m.statusMessage = "Filter validation failed: " + err.Error()
+				m.statusMessageType = "error"
+				return m, nil
+			}
+		}
+		if err := filters.Save(m.queries, m.filterMap); err != nil {
+			m.statusMessage = "Failed to save filter: " + err.Error()
+			m.statusMessageType = "error"
+			return m, nil
+		}
+		m.statusMessage = "Filter updated"
+		m.statusMessageType = "info"
+		return m, computeFilteredCounts(m.feedManager, m.filterMap)
+
+	case FilterEditorErrorMsg:
+		m.statusMessage = msg.Err
+		m.statusMessageType = "error"
+		return m, nil
+
+	case FilteredCountsMsg:
+		m.filteredUnreadCounts = msg.Counts
+		if m.filteredUnreadCounts == nil {
+			m.filteredUnreadCounts = make(map[int64]int64)
+		}
 		return m, nil
 
 	case FeedInfoLoadedMsg:
@@ -1356,14 +1453,37 @@ func (m Model) handleFeedListKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case "U":
-		// Check if EDITOR is set
 		if config.GetEditor() == "" {
 			m.statusMessage = "Set EDITOR in your env to edit urls"
 			m.statusMessageType = "error"
 			return m, nil
 		}
-		// Open URLs file in editor
 		return m, openURLsFileInEditor(m.feedManager)
+
+	case "f":
+		if config.GetEditor() == "" {
+			m.statusMessage = "Set EDITOR in your env to edit filters"
+			m.statusMessageType = "error"
+			return m, nil
+		}
+		if len(m.feedList) > 0 && m.cursor < len(m.feedList) {
+			item := m.feedList[m.cursor]
+			if item.IsFolder {
+				scope := filters.FolderKey(item.FolderName)
+				return m, openFilterInEditor(m.filterMap, scope, "folder: "+item.FolderName)
+			} else if item.Feed != nil {
+				scope := filters.FeedKey(item.Feed.ID)
+				return m, openFilterInEditor(m.filterMap, scope, item.Feed.Title)
+			}
+		}
+
+	case "F":
+		if config.GetEditor() == "" {
+			m.statusMessage = "Set EDITOR in your env to edit filters"
+			m.statusMessageType = "error"
+			return m, nil
+		}
+		return m, openFilterInEditor(m.filterMap, "global", "Global")
 
 	case "i":
 		// Show feed info (only for feeds, not folders)
@@ -1918,6 +2038,48 @@ func (m Model) getUnreadStyle() lipgloss.Style {
 	return lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("2"))
 }
 
+func (m Model) renderOrangeCount(unread, total int64) string {
+	orangeStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("208"))
+	unreadStr := orangeStyle.Render(fmt.Sprintf("%d", unread))
+	countStr := fmt.Sprintf("(%s/%d)", unreadStr, total)
+	plainLen := len(fmt.Sprintf("(%d/%d)", unread, total))
+	pad := 9 - plainLen
+	if pad < 0 {
+		pad = 0
+	}
+	return strings.Repeat(" ", pad) + countStr
+}
+
+func (m Model) folderHasFilter(folderName string) bool {
+	if _, ok := m.filterMap[filters.FolderKey(folderName)]; ok {
+		return true
+	}
+	if _, ok := m.filterMap["global"]; ok {
+		return true
+	}
+	return false
+}
+
+func (m Model) filteredFolderUnread(folderName string) int64 {
+	var total int64
+	for _, item := range m.feedList {
+		if !item.IsFolder && item.IsUnderFolder && item.Feed != nil {
+			folders, _ := m.feedManager.GetFeedFolders(item.Feed.ID)
+			for _, f := range folders {
+				if f == folderName {
+					if count, ok := m.filteredUnreadCounts[item.Feed.ID]; ok {
+						total += count
+					} else {
+						total += item.Feed.UnreadItems
+					}
+					break
+				}
+			}
+		}
+	}
+	return total
+}
+
 // buildFeedDisplayList creates a flat list of folders and feeds for display
 func (m *Model) buildFeedDisplayList(feeds []database.GetFeedStatsRow) {
 	// Group feeds by folders
@@ -2218,16 +2380,22 @@ func (m Model) renderFeedList() string {
 			} else {
 				folderIcon = "📁" // Closed folder
 			}
-			countStr := fmt.Sprintf("(%d/%d)", item.UnreadItems, item.TotalItems)
+			hasFilter := m.folderHasFilter(item.FolderName)
+			unread := item.UnreadItems
+			if hasFilter {
+				unread = m.filteredFolderUnread(item.FolderName)
+			}
+			countStr := fmt.Sprintf("(%d/%d)", unread, item.TotalItems)
 			paddedCount := fmt.Sprintf("%9s", countStr)
-			// Add 2 spaces after emoji to align with feed items (which have statusEmoji + 2-char spinner)
+			if hasFilter && i != m.cursor {
+				paddedCount = m.renderOrangeCount(unread, item.TotalItems)
+			}
 			line = folderIcon + "  " + paddedCount + " " + item.FolderName
 
-			// Apply highlighting
 			if i == m.cursor {
 				line = m.applyHighlight(line, true)
 			} else {
-				if item.UnreadItems > 0 {
+				if unread > 0 {
 					line = m.getUnreadStyle().Render(line)
 				}
 				line = m.applyHighlight(line, false)
@@ -2270,14 +2438,20 @@ func (m Model) renderFeedList() string {
 				spinner = "  " // Two spaces when not spinning
 			}
 
-			// Count string right-justified to 9 characters
-			countStr := fmt.Sprintf("(%d/%d)", feed.UnreadItems, feed.TotalItems)
+			feedFiltered := len(m.filteredUnreadCounts) > 0
+			_, hasFeedFilter := m.filteredUnreadCounts[feed.ID]
+			unread := feed.UnreadItems
+			if hasFeedFilter {
+				unread = m.filteredUnreadCounts[feed.ID]
+			}
+			countStr := fmt.Sprintf("(%d/%d)", unread, feed.TotalItems)
 			paddedCount := fmt.Sprintf("%9s", countStr)
+			if feedFiltered && hasFeedFilter && i != m.cursor {
+				paddedCount = m.renderOrangeCount(unread, feed.TotalItems)
+			}
 
-			// Get display title - override for GitHub and GitLab feeds
 			displayTitle := getDisplayTitle(feed)
 
-			// Add vertical bar prefix if this feed is under a folder
 			var prefix string
 			if item.IsUnderFolder {
 				prefix = "│ "
@@ -2285,14 +2459,12 @@ func (m Model) renderFeedList() string {
 				prefix = ""
 			}
 
-			// Construct the line: prefix + status emoji (if error) + spinner (2 chars) + count (9 chars) + space + feed title
 			line = prefix + statusEmoji + spinner + paddedCount + " " + displayTitle
 
-			// Apply highlighting
 			if i == m.cursor {
 				line = m.applyHighlight(line, true)
 			} else {
-				if feed.UnreadItems > 0 {
+				if unread > 0 {
 					line = m.getUnreadStyle().Render(line)
 				}
 				line = m.applyHighlight(line, false)
@@ -3143,6 +3315,8 @@ func (m Model) renderHelpView() string {
 	fmt.Fprintf(&content, "  %-15s %s\n", "ctrl+f", "Title search only")
 	fmt.Fprintf(&content, "  %-15s %s\n", "u", "Add URL (with discovery)")
 	fmt.Fprintf(&content, "  %-15s %s\n", "U", "Edit URLs in $EDITOR")
+	fmt.Fprintf(&content, "  %-15s %s\n", "f", "Edit filter for feed/folder in $EDITOR")
+	fmt.Fprintf(&content, "  %-15s %s\n", "F", "Edit global filter in $EDITOR")
 	fmt.Fprintf(&content, "  %-15s %s\n", "ctrl+r", "Reload URLs from file")
 	fmt.Fprintf(&content, "  %-15s %s\n", "l", "View logs")
 	fmt.Fprintf(&content, "  %-15s %s\n", "t", "View tasks")

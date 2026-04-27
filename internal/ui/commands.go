@@ -12,6 +12,7 @@ import (
 	"github.com/jarv/newsgoat/internal/database"
 	"github.com/jarv/newsgoat/internal/discovery"
 	"github.com/jarv/newsgoat/internal/feeds"
+	"github.com/jarv/newsgoat/internal/filters"
 	"github.com/jarv/newsgoat/internal/logging"
 	"github.com/jarv/newsgoat/internal/tasks"
 )
@@ -559,5 +560,78 @@ func performSearch(feedManager *feeds.Manager, viewState ViewState, feedID int64
 		}
 
 		return SearchResultsMsg{}
+	}
+}
+
+func openFilterInEditor(fm filters.FilterMap, scope string, scopeLabel string) tea.Cmd {
+	editor := config.GetEditor()
+	if editor == "" {
+		return func() tea.Msg {
+			return FilterEditorErrorMsg{Err: "EDITOR environment variable is not set"}
+		}
+	}
+
+	return func() tea.Msg {
+		rule := fm[scope]
+		content := filters.RuleToYAML(rule, scopeLabel)
+
+		tmpFile, err := os.CreateTemp("", "newsgoat-filter-*.yaml")
+		if err != nil {
+			return FilterEditorErrorMsg{Err: "Failed to create temp file: " + err.Error()}
+		}
+		tmpPath := tmpFile.Name()
+
+		if _, err := tmpFile.WriteString(content); err != nil {
+			_ = tmpFile.Close()
+			_ = os.Remove(tmpPath)
+			return FilterEditorErrorMsg{Err: "Failed to write temp file: " + err.Error()}
+		}
+		_ = tmpFile.Close()
+
+		c := exec.Command(editor, tmpPath)
+		return tea.ExecProcess(c, func(err error) tea.Msg {
+			if err != nil {
+				_ = os.Remove(tmpPath)
+				return FilterEditorErrorMsg{Err: "Failed to open editor: " + err.Error()}
+			}
+			return FilterEditorFinishedMsg{Scope: scope, TempFilePath: tmpPath}
+		})()
+	}
+}
+
+func computeFilteredCounts(feedManager *feeds.Manager, fm filters.FilterMap) tea.Cmd {
+	return func() tea.Msg {
+		if len(fm) == 0 {
+			return FilteredCountsMsg{}
+		}
+		stats, err := feedManager.GetFeedStats()
+		if err != nil {
+			logging.Error("computeFilteredCounts: failed to get feed stats", "error", err)
+			return FilteredCountsMsg{}
+		}
+		counts := make(map[int64]int64, len(stats))
+		for _, feed := range stats {
+			folders, _ := feedManager.GetFeedFolders(feed.ID)
+			rules := filters.RulesForFeed(fm, feed.ID, folders)
+			if len(rules) == 0 {
+				continue
+			}
+			compiled := filters.CompileRules(rules)
+			items, err := feedManager.GetItemsWithReadStatus(feed.ID)
+			if err != nil {
+				continue
+			}
+			var unread int64
+			for _, item := range items {
+				if item.Read {
+					continue
+				}
+				if filters.MatchItem(item.Link, item.Title, item.Description, compiled) {
+					unread++
+				}
+			}
+			counts[feed.ID] = unread
+		}
+		return FilteredCountsMsg{Counts: counts}
 	}
 }
