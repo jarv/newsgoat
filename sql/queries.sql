@@ -221,3 +221,94 @@ FROM items i
 LEFT JOIN read_status rs ON i.id = rs.item_id
 WHERE i.feed_id = ? AND (i.title LIKE '%' || ? || '%' OR i.description LIKE '%' || ? || '%' OR i.content LIKE '%' || ? || '%')
 ORDER BY i.published DESC;
+
+-- name: SearchArticlesSince :many
+SELECT
+    i.id,
+    i.title,
+    i.description,
+    i.link,
+    i.published,
+    f.title as feed_title,
+    f.url as feed_url
+FROM items i
+JOIN feeds f ON i.feed_id = f.id
+WHERE f.visible = TRUE
+    AND i.published >= ?
+    AND (i.title LIKE '%' || ? || '%' OR i.description LIKE '%' || ? || '%' OR i.content LIKE '%' || ? || '%')
+ORDER BY i.published DESC
+LIMIT ?;
+
+-- name: ListRecentArticles :many
+SELECT
+    i.id,
+    i.title,
+    i.description,
+    i.link,
+    i.published,
+    f.title as feed_title,
+    f.url as feed_url
+FROM items i
+JOIN feeds f ON i.feed_id = f.id
+WHERE f.visible = TRUE AND i.published >= ?
+ORDER BY i.published DESC
+LIMIT ?;
+
+-- name: ListRecentArticlesByFolder :many
+SELECT
+    i.id,
+    i.title,
+    i.description,
+    i.link,
+    i.published,
+    f.title as feed_title,
+    f.url as feed_url
+FROM items i
+JOIN feeds f ON i.feed_id = f.id
+JOIN feed_folders ff ON f.id = ff.feed_id
+WHERE f.visible = TRUE AND i.published >= ? AND ff.folder_name = ?
+ORDER BY i.published DESC
+LIMIT ?;
+
+-- name: ListRecentArticlesByFeed :many
+SELECT
+    i.id,
+    i.title,
+    i.description,
+    i.link,
+    i.published,
+    f.title as feed_title,
+    f.url as feed_url
+FROM items i
+JOIN feeds f ON i.feed_id = f.id
+WHERE f.visible = TRUE AND i.published >= ? AND f.title LIKE '%' || ? || '%'
+ORDER BY i.published DESC
+LIMIT ?;
+
+-- name: GetArticleByID :one
+SELECT
+    i.id,
+    i.title,
+    i.description,
+    i.content,
+    i.link,
+    i.published,
+    f.title as feed_title,
+    f.url as feed_url
+FROM items i
+JOIN feeds f ON i.feed_id = f.id
+WHERE i.id = ?;
+
+-- name: ListVisibleFeedsWithFolders :many
+SELECT
+    f.id,
+    f.title,
+    f.url,
+    COUNT(i.id) as total_items,
+    COUNT(CASE WHEN i.id IS NOT NULL AND COALESCE(rs.read, FALSE) = FALSE THEN 1 END) as unread_items
+FROM feeds f
+LEFT JOIN items i ON f.id = i.feed_id
+LEFT JOIN read_status rs ON i.id = rs.item_id
+WHERE f.visible = TRUE
+GROUP BY f.id, f.title, f.url
+ORDER BY f.title;

@@ -27,6 +27,7 @@ Meanwhile, “vibe coding” was catching on, and it seemed like a fun excuse to
 - **Auto-discovery**: Automatic feed discovery when adding URLs. Press <kbd>u</kbd> to add a youtube link and automatically subscribe to the channel's feed.
 - **Regex filters**: Define regex patterns to filter items by URL, Title, or Description. Press <kbd>f</kbd> on a feed or folder to configure a filter in `$EDITOR` using YAML syntax, or <kbd>F</kbd> for a global filter. Filters compose with AND logic across global, folder, and feed scopes. Prefix a pattern with `!` to negate it (e.g. `!/shorts/`). Feeds and folders with a configured filter are marked with a ✦ indicator.
 - **OPML import**: Import feeds from an OPML file or URL with `newsgoat import <file|url>`. The import is additive — existing feeds are kept, duplicates are skipped, and folder structure from the OPML is preserved.
+- **MCP server**: Query your cached articles from any AI client via the [Model Context Protocol](https://modelcontextprotocol.io/). Run `newsgoat mcp-server` as a stdio transport. See [MCP Server](#mcp-server) for configuration.
 
 ## Feed Auto Discovery
 
@@ -385,3 +386,31 @@ Search filters results in real-time as you type, making it easy to find specific
 | 🔄 | Running task |
 | 💥 | Failed task |
 | │ | Feed under folder (vertical bar prefix) |
+
+## MCP Server
+
+newsgoat includes a built-in [MCP](https://modelcontextprotocol.io/) server that lets AI clients query your cached articles.
+
+### Configuration
+
+Add to your MCP client config (e.g., Claude Desktop `claude_desktop_config.json` or opencode `agents.json`):
+
+```json
+{
+  "mcpServers": {
+    "newsgoat": {
+      "command": "newsgoat",
+      "args": ["mcp-server"]
+    }
+  }
+}
+```
+
+### Available Tools
+
+| Tool | Description |
+|------|-------------|
+| `search_articles` | Full-text search across titles, descriptions, and content. Params: `query` (required), `since` (e.g. "24h", "7d"), `limit` |
+| `list_recent_articles` | List recent articles, optionally filtered by `folder` or `feed` name. Params: `since`, `folder`, `feed`, `limit` |
+| `get_article` | Get full content of a specific article. Params: `id` (required) |
+| `list_feeds` | List all visible feeds with folders and unread/total counts |
