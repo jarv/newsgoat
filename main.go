@@ -14,6 +14,7 @@ import (
 	"github.com/jarv/newsgoat/internal/discovery"
 	"github.com/jarv/newsgoat/internal/feeds"
 	"github.com/jarv/newsgoat/internal/logging"
+	mcpserver "github.com/jarv/newsgoat/internal/mcp"
 	"github.com/jarv/newsgoat/internal/opml"
 	"github.com/jarv/newsgoat/internal/tasks"
 	"github.com/jarv/newsgoat/internal/ui"
@@ -40,7 +41,8 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Usage: newsgoat [options] [command]\n\n")
 		fmt.Fprintf(os.Stderr, "Commands:\n")
 		fmt.Fprintf(os.Stderr, "  add <url>          Add a feed URL to the database\n")
-		fmt.Fprintf(os.Stderr, "  import <file|url>  Import feeds from an OPML file\n\n")
+		fmt.Fprintf(os.Stderr, "  import <file|url>  Import feeds from an OPML file\n")
+		fmt.Fprintf(os.Stderr, "  mcp-server         Start MCP server (stdio transport)\n\n")
 		fmt.Fprintf(os.Stderr, "Options:\n")
 		flag.PrintDefaults()
 		fmt.Fprintf(os.Stderr, "\nEnvironment Variables:\n")
@@ -90,6 +92,12 @@ func main() {
 				os.Exit(1)
 			}
 			if err := importOPML(args[1]); err != nil {
+				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+				os.Exit(1)
+			}
+			return
+		case "mcp-server":
+			if err := runMCPServer(); err != nil {
 				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 				os.Exit(1)
 			}
@@ -219,8 +227,23 @@ func importOPML(source string) error {
 	return nil
 }
 
+func runMCPServer() error {
+	db, queries, err := database.InitDBWithSchema(schemaSQL)
+	if err != nil {
+		return fmt.Errorf("failed to initialize database: %w", err)
+	}
+	defer func() {
+		_ = db.Close()
+	}()
+
+	if err := RunMigrations(db); err != nil {
+		return fmt.Errorf("failed to run migrations: %w", err)
+	}
+
+	return mcpserver.Run(queries)
+}
+
 func run(debug bool) error {
-	// Initialize database first
 	db, queries, err := database.InitDBWithSchema(schemaSQL)
 	if err != nil {
 		return fmt.Errorf("failed to initialize database: %w", err)
