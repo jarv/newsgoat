@@ -1,3 +1,10 @@
+# [3.6.0](https://github.com/jarv/newsgoat/compare/v3.5.4...v3.6.0) (2026-04-28)
+
+
+### Features
+
+* add MCP server for querying cached articles ([#139](https://github.com/jarv/newsgoat/issues/139)) ([fb7ca6c](https://github.com/jarv/newsgoat/commit/fb7ca6c0721796cbb695ea723c48995450f0fe45))
+
 ## [3.5.4](https://github.com/jarv/newsgoat/compare/v3.5.3...v3.5.4) (2026-04-27)
 
 
