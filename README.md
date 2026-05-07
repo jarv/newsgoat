@@ -60,6 +60,7 @@ This will extract the `channel_id` and subscribe to the channel RSS feed.
 - Newsbeuter was archived, and I think was forked as [newsboat](https://github.com/newsboat/newsboat) and re-written in Rust.
 - [nom](https://github.com/guyfedwards/nom) is a similar terminal-based news reader (also written in Go).
 - [feedr](https://github.com/bahdotsh/feedr) a different look but looks like a really nice alternative, written in Rust.
+- [eilmeldung](https://github.com/christo-auer/eilmeldung) TUI RSS reader based on the awesome news-flash library 
 
 If you know of any other terminal-based RSS readers worth mentioning here please add them!
 
