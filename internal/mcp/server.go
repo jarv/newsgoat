@@ -22,6 +22,7 @@ func Run(queries *database.Queries) error {
 			mcp.WithString("query", mcp.Required(), mcp.Description("Search query string")),
 			mcp.WithString("since", mcp.Description("Time window, e.g. 24h, 7d, 30d. Defaults to 7d")),
 			mcp.WithNumber("limit", mcp.Description("Max results to return. Defaults to 50")),
+			mcp.WithString("after", mcp.Description("Cursor for pagination. Use the next_cursor value from a previous response to fetch the next page.")),
 		),
 		h.searchArticles,
 	)
@@ -33,6 +34,7 @@ func Run(queries *database.Queries) error {
 			mcp.WithString("folder", mcp.Description("Filter by folder name (exact match)")),
 			mcp.WithString("feed", mcp.Description("Filter by feed title (substring match)")),
 			mcp.WithNumber("limit", mcp.Description("Max results to return. Defaults to 50")),
+			mcp.WithString("after", mcp.Description("Cursor for pagination. Use the next_cursor value from a previous response to fetch the next page.")),
 		),
 		h.listRecentArticles,
 	)

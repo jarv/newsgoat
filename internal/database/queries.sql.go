@@ -700,6 +700,59 @@ func (q *Queries) ListRecentArticles(ctx context.Context, arg ListRecentArticles
 	return items, nil
 }
 
+const listRecentArticlesAfterCursor = `-- name: ListRecentArticlesAfterCursor :many
+SELECT
+    i.id,
+    i.title,
+    i.description,
+    i.link,
+    i.published,
+    f.title as feed_title,
+    f.url as feed_url
+FROM items i
+JOIN feeds f ON i.feed_id = f.id
+WHERE f.visible = TRUE AND i.published >= ? AND i.id < ?
+ORDER BY i.published DESC
+LIMIT ?
+`
+
+type ListRecentArticlesAfterCursorParams struct {
+	Published sql.NullTime `json:"published"`
+	ID        int64        `json:"id"`
+	Limit     int64        `json:"limit"`
+}
+
+func (q *Queries) ListRecentArticlesAfterCursor(ctx context.Context, arg ListRecentArticlesAfterCursorParams) ([]ListRecentArticlesRow, error) {
+	rows, err := q.db.QueryContext(ctx, listRecentArticlesAfterCursor, arg.Published, arg.ID, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListRecentArticlesRow
+	for rows.Next() {
+		var i ListRecentArticlesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Title,
+			&i.Description,
+			&i.Link,
+			&i.Published,
+			&i.FeedTitle,
+			&i.FeedUrl,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listRecentArticlesByFeed = `-- name: ListRecentArticlesByFeed :many
 SELECT
     i.id,
@@ -734,6 +787,60 @@ type ListRecentArticlesByFeedRow struct {
 
 func (q *Queries) ListRecentArticlesByFeed(ctx context.Context, arg ListRecentArticlesByFeedParams) ([]ListRecentArticlesByFeedRow, error) {
 	rows, err := q.db.QueryContext(ctx, listRecentArticlesByFeed, arg.Published, arg.Column2, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListRecentArticlesByFeedRow
+	for rows.Next() {
+		var i ListRecentArticlesByFeedRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Title,
+			&i.Description,
+			&i.Link,
+			&i.Published,
+			&i.FeedTitle,
+			&i.FeedUrl,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listRecentArticlesByFeedAfterCursor = `-- name: ListRecentArticlesByFeedAfterCursor :many
+SELECT
+    i.id,
+    i.title,
+    i.description,
+    i.link,
+    i.published,
+    f.title as feed_title,
+    f.url as feed_url
+FROM items i
+JOIN feeds f ON i.feed_id = f.id
+WHERE f.visible = TRUE AND i.published >= ? AND f.title LIKE '%' || ? || '%' AND i.id < ?
+ORDER BY i.published DESC
+LIMIT ?
+`
+
+type ListRecentArticlesByFeedAfterCursorParams struct {
+	Published sql.NullTime   `json:"published"`
+	Column2   sql.NullString `json:"column_2"`
+	ID        int64          `json:"id"`
+	Limit     int64          `json:"limit"`
+}
+
+func (q *Queries) ListRecentArticlesByFeedAfterCursor(ctx context.Context, arg ListRecentArticlesByFeedAfterCursorParams) ([]ListRecentArticlesByFeedRow, error) {
+	rows, err := q.db.QueryContext(ctx, listRecentArticlesByFeedAfterCursor, arg.Published, arg.Column2, arg.ID, arg.Limit)
 	if err != nil {
 		return nil, err
 	}
@@ -805,6 +912,127 @@ func (q *Queries) ListRecentArticlesByFolder(ctx context.Context, arg ListRecent
 	var items []ListRecentArticlesByFolderRow
 	for rows.Next() {
 		var i ListRecentArticlesByFolderRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Title,
+			&i.Description,
+			&i.Link,
+			&i.Published,
+			&i.FeedTitle,
+			&i.FeedUrl,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listRecentArticlesByFolderAfterCursor = `-- name: ListRecentArticlesByFolderAfterCursor :many
+SELECT
+    i.id,
+    i.title,
+    i.description,
+    i.link,
+    i.published,
+    f.title as feed_title,
+    f.url as feed_url
+FROM items i
+JOIN feeds f ON i.feed_id = f.id
+JOIN feed_folders ff ON f.id = ff.feed_id
+WHERE f.visible = TRUE AND i.published >= ? AND ff.folder_name = ? AND i.id < ?
+ORDER BY i.published DESC
+LIMIT ?
+`
+
+type ListRecentArticlesByFolderAfterCursorParams struct {
+	Published  sql.NullTime `json:"published"`
+	FolderName string       `json:"folder_name"`
+	ID         int64        `json:"id"`
+	Limit      int64        `json:"limit"`
+}
+
+func (q *Queries) ListRecentArticlesByFolderAfterCursor(ctx context.Context, arg ListRecentArticlesByFolderAfterCursorParams) ([]ListRecentArticlesByFolderRow, error) {
+	rows, err := q.db.QueryContext(ctx, listRecentArticlesByFolderAfterCursor, arg.Published, arg.FolderName, arg.ID, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListRecentArticlesByFolderRow
+	for rows.Next() {
+		var i ListRecentArticlesByFolderRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Title,
+			&i.Description,
+			&i.Link,
+			&i.Published,
+			&i.FeedTitle,
+			&i.FeedUrl,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const searchArticlesSinceAfterCursor = `-- name: SearchArticlesSinceAfterCursor :many
+SELECT
+    i.id,
+    i.title,
+    i.description,
+    i.link,
+    i.published,
+    f.title as feed_title,
+    f.url as feed_url
+FROM items i
+JOIN feeds f ON i.feed_id = f.id
+WHERE f.visible = TRUE
+    AND i.published >= ?
+    AND (i.title LIKE '%' || ? || '%' OR i.description LIKE '%' || ? || '%' OR i.content LIKE '%' || ? || '%')
+    AND i.id < ?
+ORDER BY i.published DESC
+LIMIT ?
+`
+
+type SearchArticlesSinceAfterCursorParams struct {
+	Published sql.NullTime   `json:"published"`
+	Column2   sql.NullString `json:"column_2"`
+	Column3   sql.NullString `json:"column_3"`
+	Column4   sql.NullString `json:"column_4"`
+	ID        int64          `json:"id"`
+	Limit     int64          `json:"limit"`
+}
+
+func (q *Queries) SearchArticlesSinceAfterCursor(ctx context.Context, arg SearchArticlesSinceAfterCursorParams) ([]SearchArticlesSinceRow, error) {
+	rows, err := q.db.QueryContext(ctx, searchArticlesSinceAfterCursor,
+		arg.Published,
+		arg.Column2,
+		arg.Column3,
+		arg.Column4,
+		arg.ID,
+		arg.Limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []SearchArticlesSinceRow
+	for rows.Next() {
+		var i SearchArticlesSinceRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.Title,

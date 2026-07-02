@@ -254,6 +254,21 @@ WHERE f.visible = TRUE AND i.published >= ?
 ORDER BY i.published DESC
 LIMIT ?;
 
+-- name: ListRecentArticlesAfterCursor :many
+SELECT
+    i.id,
+    i.title,
+    i.description,
+    i.link,
+    i.published,
+    f.title as feed_title,
+    f.url as feed_url
+FROM items i
+JOIN feeds f ON i.feed_id = f.id
+WHERE f.visible = TRUE AND i.published >= ? AND i.id < ?
+ORDER BY i.published DESC
+LIMIT ?;
+
 -- name: ListRecentArticlesByFolder :many
 SELECT
     i.id,
@@ -270,6 +285,22 @@ WHERE f.visible = TRUE AND i.published >= ? AND ff.folder_name = ?
 ORDER BY i.published DESC
 LIMIT ?;
 
+-- name: ListRecentArticlesByFolderAfterCursor :many
+SELECT
+    i.id,
+    i.title,
+    i.description,
+    i.link,
+    i.published,
+    f.title as feed_title,
+    f.url as feed_url
+FROM items i
+JOIN feeds f ON i.feed_id = f.id
+JOIN feed_folders ff ON f.id = ff.feed_id
+WHERE f.visible = TRUE AND i.published >= ? AND ff.folder_name = ? AND i.id < ?
+ORDER BY i.published DESC
+LIMIT ?;
+
 -- name: ListRecentArticlesByFeed :many
 SELECT
     i.id,
@@ -282,6 +313,39 @@ SELECT
 FROM items i
 JOIN feeds f ON i.feed_id = f.id
 WHERE f.visible = TRUE AND i.published >= ? AND f.title LIKE '%' || ? || '%'
+ORDER BY i.published DESC
+LIMIT ?;
+
+-- name: ListRecentArticlesByFeedAfterCursor :many
+SELECT
+    i.id,
+    i.title,
+    i.description,
+    i.link,
+    i.published,
+    f.title as feed_title,
+    f.url as feed_url
+FROM items i
+JOIN feeds f ON i.feed_id = f.id
+WHERE f.visible = TRUE AND i.published >= ? AND f.title LIKE '%' || ? || '%' AND i.id < ?
+ORDER BY i.published DESC
+LIMIT ?;
+
+-- name: SearchArticlesSinceAfterCursor :many
+SELECT
+    i.id,
+    i.title,
+    i.description,
+    i.link,
+    i.published,
+    f.title as feed_title,
+    f.url as feed_url
+FROM items i
+JOIN feeds f ON i.feed_id = f.id
+WHERE f.visible = TRUE
+    AND i.published >= ?
+    AND (i.title LIKE '%' || ? || '%' OR i.description LIKE '%' || ? || '%' OR i.content LIKE '%' || ? || '%')
+    AND i.id < ?
 ORDER BY i.published DESC
 LIMIT ?;
 

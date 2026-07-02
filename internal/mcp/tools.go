@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -61,6 +62,17 @@ func formatArticleRow(id int64, title, description, link, feedTitle string, publ
 	return b.String()
 }
 
+func parseCursor(s string) (int64, error) {
+	if s == "" {
+		return 0, nil
+	}
+	id, err := strconv.ParseInt(strings.TrimSpace(s), 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("invalid cursor: %q", s)
+	}
+	return id, nil
+}
+
 func (h *handlers) searchArticles(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	query := req.GetString("query", "")
 	if query == "" {
@@ -71,18 +83,36 @@ func (h *handlers) searchArticles(ctx context.Context, req mcp.CallToolRequest) 
 		return mcp.NewToolResultError(err.Error()), nil
 	}
 	limit := int64(req.GetInt("limit", 50))
-	if limit <= 0 || limit > 200 {
+	if limit <= 0 || limit > 500 {
 		limit = 50
+	}
+	afterCursor, err := parseCursor(req.GetString("after", ""))
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
 	}
 
 	queryParam := sql.NullString{String: query, Valid: true}
-	rows, err := h.queries.SearchArticlesSince(ctx, database.SearchArticlesSinceParams{
-		Published: sql.NullTime{Time: since, Valid: true},
-		Column2:   queryParam,
-		Column3:   queryParam,
-		Column4:   queryParam,
-		Limit:     limit,
-	})
+	publishedParam := sql.NullTime{Time: since, Valid: true}
+
+	var rows []database.SearchArticlesSinceRow
+	if afterCursor > 0 {
+		rows, err = h.queries.SearchArticlesSinceAfterCursor(ctx, database.SearchArticlesSinceAfterCursorParams{
+			Published: publishedParam,
+			Column2:   queryParam,
+			Column3:   queryParam,
+			Column4:   queryParam,
+			ID:        afterCursor,
+			Limit:     limit,
+		})
+	} else {
+		rows, err = h.queries.SearchArticlesSince(ctx, database.SearchArticlesSinceParams{
+			Published: publishedParam,
+			Column2:   queryParam,
+			Column3:   queryParam,
+			Column4:   queryParam,
+			Limit:     limit,
+		})
+	}
 	if err != nil {
 		return mcp.NewToolResultError("search failed: " + err.Error()), nil
 	}
@@ -97,6 +127,9 @@ func (h *handlers) searchArticles(ctx context.Context, req mcp.CallToolRequest) 
 		b.WriteString(formatArticleRow(r.ID, r.Title, r.Description, r.Link, r.FeedTitle, r.Published))
 		b.WriteString("\n")
 	}
+	if int64(len(rows)) == limit {
+		fmt.Fprintf(&b, "next_cursor: %d\n", rows[len(rows)-1].ID)
+	}
 	return mcp.NewToolResultText(b.String()), nil
 }
 
@@ -106,11 +139,15 @@ func (h *handlers) listRecentArticles(ctx context.Context, req mcp.CallToolReque
 		return mcp.NewToolResultError(err.Error()), nil
 	}
 	limit := int64(req.GetInt("limit", 50))
-	if limit <= 0 || limit > 200 {
+	if limit <= 0 || limit > 500 {
 		limit = 50
 	}
 	folder := req.GetString("folder", "")
 	feed := req.GetString("feed", "")
+	afterCursor, err := parseCursor(req.GetString("after", ""))
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
 
 	type row struct {
 		ID          int64
@@ -122,41 +159,87 @@ func (h *handlers) listRecentArticles(ctx context.Context, req mcp.CallToolReque
 	}
 
 	var rows []row
+	publishedParam := sql.NullTime{Time: since, Valid: true}
 
 	if folder != "" {
-		dbRows, err := h.queries.ListRecentArticlesByFolder(ctx, database.ListRecentArticlesByFolderParams{
-			Published:  sql.NullTime{Time: since, Valid: true},
-			FolderName: folder,
-			Limit:      limit,
-		})
-		if err != nil {
-			return mcp.NewToolResultError("query failed: " + err.Error()), nil
-		}
-		for _, r := range dbRows {
-			rows = append(rows, row{r.ID, r.Title, r.Description, r.Link, r.Published, r.FeedTitle})
+		if afterCursor > 0 {
+			dbRows, err := h.queries.ListRecentArticlesByFolderAfterCursor(ctx, database.ListRecentArticlesByFolderAfterCursorParams{
+				Published:  publishedParam,
+				FolderName: folder,
+				ID:         afterCursor,
+				Limit:      limit,
+			})
+			if err != nil {
+				return mcp.NewToolResultError("query failed: " + err.Error()), nil
+			}
+			for _, r := range dbRows {
+				rows = append(rows, row{r.ID, r.Title, r.Description, r.Link, r.Published, r.FeedTitle})
+			}
+		} else {
+			dbRows, err := h.queries.ListRecentArticlesByFolder(ctx, database.ListRecentArticlesByFolderParams{
+				Published:  publishedParam,
+				FolderName: folder,
+				Limit:      limit,
+			})
+			if err != nil {
+				return mcp.NewToolResultError("query failed: " + err.Error()), nil
+			}
+			for _, r := range dbRows {
+				rows = append(rows, row{r.ID, r.Title, r.Description, r.Link, r.Published, r.FeedTitle})
+			}
 		}
 	} else if feed != "" {
-		dbRows, err := h.queries.ListRecentArticlesByFeed(ctx, database.ListRecentArticlesByFeedParams{
-			Published: sql.NullTime{Time: since, Valid: true},
-			Column2:   sql.NullString{String: feed, Valid: true},
-			Limit:     limit,
-		})
-		if err != nil {
-			return mcp.NewToolResultError("query failed: " + err.Error()), nil
-		}
-		for _, r := range dbRows {
-			rows = append(rows, row{r.ID, r.Title, r.Description, r.Link, r.Published, r.FeedTitle})
+		feedParam := sql.NullString{String: feed, Valid: true}
+		if afterCursor > 0 {
+			dbRows, err := h.queries.ListRecentArticlesByFeedAfterCursor(ctx, database.ListRecentArticlesByFeedAfterCursorParams{
+				Published: publishedParam,
+				Column2:   feedParam,
+				ID:        afterCursor,
+				Limit:     limit,
+			})
+			if err != nil {
+				return mcp.NewToolResultError("query failed: " + err.Error()), nil
+			}
+			for _, r := range dbRows {
+				rows = append(rows, row{r.ID, r.Title, r.Description, r.Link, r.Published, r.FeedTitle})
+			}
+		} else {
+			dbRows, err := h.queries.ListRecentArticlesByFeed(ctx, database.ListRecentArticlesByFeedParams{
+				Published: publishedParam,
+				Column2:   feedParam,
+				Limit:     limit,
+			})
+			if err != nil {
+				return mcp.NewToolResultError("query failed: " + err.Error()), nil
+			}
+			for _, r := range dbRows {
+				rows = append(rows, row{r.ID, r.Title, r.Description, r.Link, r.Published, r.FeedTitle})
+			}
 		}
 	} else {
-		dbRows, err := h.queries.ListRecentArticles(ctx, database.ListRecentArticlesParams{
-			Published: sql.NullTime{Time: since, Valid: true},
-			Limit:     limit,
-		})
-		if err != nil {
-			return mcp.NewToolResultError("query failed: " + err.Error()), nil
-		}
-		for _, r := range dbRows {
-			rows = append(rows, row{r.ID, r.Title, r.Description, r.Link, r.Published, r.FeedTitle})
+		if afterCursor > 0 {
+			dbRows, err := h.queries.ListRecentArticlesAfterCursor(ctx, database.ListRecentArticlesAfterCursorParams{
+				Published: publishedParam,
+				ID:        afterCursor,
+				Limit:     limit,
+			})
+			if err != nil {
+				return mcp.NewToolResultError("query failed: " + err.Error()), nil
+			}
+			for _, r := range dbRows {
+				rows = append(rows, row{r.ID, r.Title, r.Description, r.Link, r.Published, r.FeedTitle})
+			}
+		} else {
+			dbRows, err := h.queries.ListRecentArticles(ctx, database.ListRecentArticlesParams{
+				Published: publishedParam,
+				Limit:     limit,
+			})
+			if err != nil {
+				return mcp.NewToolResultError("query failed: " + err.Error()), nil
+			}
+			for _, r := range dbRows {
+				rows = append(rows, row{r.ID, r.Title, r.Description, r.Link, r.Published, r.FeedTitle})
+			}
 		}
 	}
 
@@ -169,6 +252,9 @@ func (h *handlers) listRecentArticles(ctx context.Context, req mcp.CallToolReque
 	for _, r := range rows {
 		b.WriteString(formatArticleRow(r.ID, r.Title, r.Description, r.Link, r.FeedTitle, r.Published))
 		b.WriteString("\n")
+	}
+	if int64(len(rows)) == limit {
+		fmt.Fprintf(&b, "next_cursor: %d\n", rows[len(rows)-1].ID)
 	}
 	return mcp.NewToolResultText(b.String()), nil
 }
