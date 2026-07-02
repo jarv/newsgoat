@@ -1,3 +1,10 @@
+# [3.7.0](https://github.com/jarv/newsgoat/compare/v3.6.0...v3.7.0) (2026-07-02)
+
+
+### Features
+
+* **mcp:** Add cursor pagination to list and search tools ([e35dc6c](https://github.com/jarv/newsgoat/commit/e35dc6cf46bf363b7dff2232b2cc4acc166ee783))
+
 # [3.6.0](https://github.com/jarv/newsgoat/compare/v3.5.4...v3.6.0) (2026-04-28)
 
 
