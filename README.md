@@ -1,4 +1,5 @@
 # NewsGoat
+<!--noop-->
 
 <p align="center">
   <img src="./.github/screenshot.png" alt="newsgoat screenshot" height="200">
