@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strings"
 
@@ -89,7 +90,11 @@ func checkGenericFeed(url string) (string, error) {
 		if err != nil {
 			return "", fmt.Errorf("failed to read response body: %w", err)
 		}
-		return discoverFeedFromHTML(string(body), url)
+		baseURL := url
+		if resp.Request != nil && resp.Request.URL != nil {
+			baseURL = resp.Request.URL.String()
+		}
+		return discoverFeedFromHTML(string(body), baseURL)
 	}
 
 	return "", fmt.Errorf("unsupported content type: %s", contentType)
@@ -111,12 +116,7 @@ func discoverFeedFromHTML(htmlContent string, baseURL string) (string, error) {
 		return "", fmt.Errorf("no feed link found in HTML")
 	}
 
-	// If the feed URL is relative, make it absolute
-	if !strings.HasPrefix(feedURL, "http://") && !strings.HasPrefix(feedURL, "https://") {
-		return resolveURL(baseURL, feedURL), nil
-	}
-
-	return feedURL, nil
+	return resolveURL(baseURL, feedURL)
 }
 
 func findFeedLink(n *html.Node) string {
@@ -166,25 +166,19 @@ func isFeedType(typeAttr string) bool {
 	return typeAttr == "application/rss+xml" || typeAttr == "application/atom+xml"
 }
 
-func resolveURL(baseURL, relativeURL string) string {
-	if strings.HasPrefix(relativeURL, "/") {
-		// Extract scheme and host from base URL
-		parts := strings.SplitN(baseURL, "://", 2)
-		if len(parts) != 2 {
-			return relativeURL
-		}
-		scheme := parts[0]
-		hostAndPath := strings.SplitN(parts[1], "/", 2)
-		host := hostAndPath[0]
-		return fmt.Sprintf("%s://%s%s", scheme, host, relativeURL)
+func resolveURL(baseURL, relativeURL string) (string, error) {
+	reference, err := url.Parse(relativeURL)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse feed URL: %w", err)
 	}
-
-	// For relative paths without leading slash, append to base URL directory
-	lastSlash := strings.LastIndex(baseURL, "/")
-	if lastSlash == -1 {
-		return relativeURL
+	if reference.IsAbs() {
+		return reference.String(), nil
 	}
-	return baseURL[:lastSlash+1] + relativeURL
+	base, err := url.Parse(baseURL)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse base URL: %w", err)
+	}
+	return base.ResolveReference(reference).String(), nil
 }
 
 // GetURLType determines the type of URL
