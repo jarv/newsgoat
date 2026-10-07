@@ -1,18 +1,23 @@
 package discovery
 
 import (
+	"fmt"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
 func TestDiscoverFeedFromHTML(t *testing.T) {
 	tests := []struct {
-		name        string
-		filename    string
-		baseURL     string
-		wantURL     string
-		wantErr     bool
+		name     string
+		filename string
+		baseURL  string
+		wantURL  string
+		wantErr  bool
 	}{
 		{
 			name:     "RSS feed with relative URL",
@@ -116,8 +121,150 @@ func TestResolveURL(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := resolveURL(tt.baseURL, tt.relativeURL); got != tt.want {
+			got, err := resolveURL(tt.baseURL, tt.relativeURL)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got != tt.want {
 				t.Errorf("resolveURL(%q, %q) = %v, want %v", tt.baseURL, tt.relativeURL, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDiscoverFeedFromHTMLReferences(t *testing.T) {
+	tests := []struct {
+		name    string
+		baseURL string
+		href    string
+		want    string
+	}{
+		{"host without path", "https://example.com", "feed.xml", "https://example.com/feed.xml"},
+		{"host with port", "https://example.com:8443", "feed.xml", "https://example.com:8443/feed.xml"},
+		{"scheme relative", "https://example.com/blog/", "//feeds.example.org/rss.xml", "https://feeds.example.org/rss.xml"},
+		{"parent directory", "https://example.com/blog/posts/", "../feed.xml", "https://example.com/blog/feed.xml"},
+		{"current directory", "https://example.com/blog/post.html", "./feed.xml", "https://example.com/blog/feed.xml"},
+		{"query reference", "https://example.com/blog/index.html?old=1", "?format=rss", "https://example.com/blog/index.html?format=rss"},
+		{"slash in page query", "https://example.com/blog/post?next=/elsewhere/", "feed.xml", "https://example.com/blog/feed.xml"},
+		{"slash in fragment", "https://example.com/blog/post#part/section", "feed.xml", "https://example.com/blog/feed.xml"},
+		{"root reference with page query", "https://example.com?next=/blog", "/feed.xml", "https://example.com/feed.xml"},
+		{"escaped page path", "https://example.com/a%2Fb/post", "feed.xml", "https://example.com/a%2Fb/feed.xml"},
+		{"absolute feed", "https://example.com/blog/", "https://feeds.example.org/rss.xml", "https://feeds.example.org/rss.xml"},
+		{"root feed", "https://example.com/blog/", "/rss.xml", "https://example.com/rss.xml"},
+		{"relative feed", "https://example.com/blog/", "feed.xml", "https://example.com/blog/feed.xml"},
+		{"absolute feed with invalid base", "https://example.com/%zz", "https://feeds.example.org/rss.xml", "https://feeds.example.org/rss.xml"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			content := fmt.Sprintf(`<link rel="alternate" type="application/rss+xml" href="%s">`, tt.href)
+			got, err := DiscoverFeedFromHTML(content, tt.baseURL)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got != tt.want {
+				t.Errorf("DiscoverFeedFromHTML() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDiscoverFeedFromHTMLInvalidURL(t *testing.T) {
+	tests := []struct {
+		name    string
+		baseURL string
+		href    string
+	}{
+		{"invalid reference", "https://example.com/blog/", "feed%zz.xml"},
+		{"invalid base", "https://example.com/%zz", "feed.xml"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			content := fmt.Sprintf(`<link rel="alternate" type="application/rss+xml" href="%s">`, tt.href)
+			got, err := DiscoverFeedFromHTML(content, tt.baseURL)
+			if err == nil || got != "" {
+				t.Errorf("DiscoverFeedFromHTML() = %q, %v, want an empty URL and an error", got, err)
+			}
+		})
+	}
+}
+
+func TestDiscoverFeedAfterDirectoryRedirect(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/old/index.html" {
+			http.Redirect(w, r, "/blog/index.html", http.StatusMovedPermanently)
+			return
+		}
+		w.Header().Set("Content-Type", "text/html")
+		_, _ = fmt.Fprint(w, `<link rel="alternate" type="application/rss+xml" href="feed.xml">`)
+	}))
+	defer server.Close()
+	got, err := DiscoverFeed(server.URL + "/old/index.html")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := server.URL + "/blog/feed.xml"; got != want {
+		t.Errorf("DiscoverFeed() = %q, want %q", got, want)
+	}
+}
+
+type discoveryTransport func(*http.Request) (*http.Response, error)
+
+func (f discoveryTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	return f(req)
+}
+
+func TestDiscoverFeedWithoutResponseRequest(t *testing.T) {
+	for _, responseRequest := range []*http.Request{nil, {}} {
+		t.Run(fmt.Sprintf("request_%v", responseRequest), func(t *testing.T) {
+			originalClient := http.DefaultClient
+			t.Cleanup(func() { http.DefaultClient = originalClient })
+			http.DefaultClient = &http.Client{Transport: discoveryTransport(func(*http.Request) (*http.Response, error) {
+				return &http.Response{
+					StatusCode: http.StatusOK,
+					Header:     http.Header{"Content-Type": {"text/html"}},
+					Body:       io.NopCloser(strings.NewReader(`<link rel="alternate" type="application/rss+xml" href="feed.xml">`)),
+					Request:    responseRequest,
+				}, nil
+			})}
+			got, err := DiscoverFeed("https://example.com/blog/index.html")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if want := "https://example.com/blog/feed.xml"; got != want {
+				t.Errorf("DiscoverFeed() = %q, want %q", got, want)
+			}
+		})
+	}
+}
+
+func TestDiscoverFeedAfterRedirect(t *testing.T) {
+	tests := []struct {
+		name string
+		href string
+		want string
+	}{
+		{"relative", "rss.xml", "/blog/rss.xml"},
+		{"root relative", "/rss.xml", "/rss.xml"},
+		{"parent relative", "../rss.xml", "/rss.xml"},
+		{"query relative", "?format=rss", "/blog/index.html?format=rss"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			page := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "text/html")
+				_, _ = fmt.Fprintf(w, `<link rel="alternate" type="application/atom+xml" href="%s">`, tt.href)
+			}))
+			defer page.Close()
+			start := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				http.Redirect(w, r, page.URL+"/blog/index.html", http.StatusFound)
+			}))
+			defer start.Close()
+			got, err := DiscoverFeed(start.URL + "/old")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if want := page.URL + tt.want; got != want {
+				t.Errorf("DiscoverFeed() = %q, want %q", got, want)
 			}
 		})
 	}
